@@ -19,7 +19,7 @@ package uk.gov.hmrc.healthmetrics.connector
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.{Reads, __}
 import uk.gov.hmrc.healthmetrics.connector.ShutterConnector.ShutterState
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, Environment, MetricFilter, ShutterStatusValue, ShutterType, TeamName}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpReads, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -40,27 +40,31 @@ class ShutterConnector @Inject() (
     serviceConfig.baseUrl("shutter-api")
     
   def getShutterStates(
-    st            : String
-  , env           : String
-  , teamName      : Option[TeamName]       = None
-  , digitalService: Option[DigitalService] = None
+    st          : ShutterType
+  , env         : Environment
+  , metricFilter: MetricFilter
   )(using
     HeaderCarrier
   ): Future[Seq[ShutterState]] =
      given Reads[ShutterState] = ShutterState.reads
+
+     val params: MetricFilter => Map[String, String] =
+      case TeamName(name)       => Map("teamName"       -> name)
+      case DigitalService(name) => Map("digitalService" -> name)
+
      httpClientV2
-      .get(url"$url/shutter-api/${env}/${st}/states?teamName=${teamName.map(_.asString)}&digitalService=${digitalService.map(_.asString)}")
+      .get(url"$url/shutter-api/${env.asString}/${st.asString}/states?${params(metricFilter)}")
       .execute[Seq[ShutterState]] 
 
     
 object ShutterConnector:
   case class ShutterState(
-    shutterType: String
-  , status     : String
+    shutterType: ShutterType
+  , status     : ShutterStatusValue
   )
 
   object ShutterState:
     val reads: Reads[ShutterState] =
-      ( (__ \ "type"             ).read[String]
-      ~ (__ \ "status" \ "value" ).read[String]
+      ( (__ \ "type"             ).read[ShutterType]
+      ~ (__ \ "status" \ "value" ).read[ShutterStatusValue]
       )(ShutterState.apply)

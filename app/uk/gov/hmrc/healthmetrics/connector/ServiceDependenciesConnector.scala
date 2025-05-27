@@ -16,11 +16,10 @@
 
 package uk.gov.hmrc.healthmetrics.connector
 
-import play.api.Logger
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.{Reads, __}
 import uk.gov.hmrc.healthmetrics.connector.ServiceDependenciesConnector.BobbyReport
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, SlugInfoFlag, TeamName}
 import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -38,21 +37,23 @@ class ServiceDependenciesConnector @Inject() (
 ):
 
   import uk.gov.hmrc.http.HttpReads.Implicits._
-  
+
   private val url: String = 
     servicesConfig.baseUrl("service-dependencies")
 
   def bobbyReports(
-    team          : Option[TeamName]       = None
-  , digitalService: Option[DigitalService] = None
-  , flag          : String
+    metricFilter: MetricFilter
+  , flag        : SlugInfoFlag
   )(using HeaderCarrier): Future[Seq[BobbyReport]] =
+
+    val params: MetricFilter => Map[String, String] =
+      case TeamName(name)       => Map("team"           -> name)
+      case DigitalService(name) => Map("digitalService" -> name)
+
     given Reads[BobbyReport] = BobbyReport.reads
     httpClientV2
-      .get(url"$url/api/bobbyReports?team=${team.map(_.asString)}&digitalService=${digitalService.map(_.asString)}&flag=$flag")
+      .get(url"$url/api/bobbyReports?${params(metricFilter)}&flag=${flag.asString}")
       .execute[Seq[BobbyReport]]
-      //.map(_.filter(v => !v.exempt && now.isAfter(v.from))).size
-
 
 object ServiceDependenciesConnector:
   case class Violation(
@@ -65,8 +66,7 @@ object ServiceDependenciesConnector:
       ( (__ \ "from"  ).read[LocalDate]
       ~ (__ \ "exempt").read[Boolean]
       )(Violation.apply _)
-  
-  
+
   case class BobbyReport(violations: Seq[Violation])
   
   object BobbyReport:

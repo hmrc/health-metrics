@@ -16,11 +16,10 @@
 
 package uk.gov.hmrc.healthmetrics.connector
 
-import play.api.Logger
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.{JsValue, Reads, __}
 import uk.gov.hmrc.healthmetrics.connector.TeamsAndRepositoriesConnector.JenkinsJob
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, TeamName}
 import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -41,10 +40,11 @@ class TeamsAndRepositoriesConnector @Inject()(
   private val url: String = 
     servicesConfig.baseUrl("teams-and-repositories")
   
-  def allTeams()(using HeaderCarrier): Future[Seq[String]] =
+  def allTeams()(using HeaderCarrier): Future[Seq[TeamName]] =
+    given Reads[TeamName] = TeamName.nameReads
     httpClientV2
      .get(url"$url/api/v2/teams")
-     .execute[Seq[String]]
+     .execute[Seq[TeamName]]
 
   def allDigitalServices()(using HeaderCarrier): Future[Seq[String]] =
     httpClientV2
@@ -70,17 +70,16 @@ class TeamsAndRepositoriesConnector @Inject()(
       .execute[Seq[JsValue]]
       .map(_.size)
 
-  def findTestJobs(
-    teamName      : Option[TeamName]       = None,
-    digitalService: Option[DigitalService] = None
-  )(using HeaderCarrier): Future[Seq[JenkinsJob]] =
-    given Reads[JenkinsJob] =
-      JenkinsJob.reads
+  def findTestJobs(metricFilter: MetricFilter)(using HeaderCarrier): Future[Seq[JenkinsJob]] =
+    given Reads[JenkinsJob] = JenkinsJob.reads
+
+    val params: MetricFilter => Map[String, String] =
+      case TeamName(name)       => Map("teamName"       -> name)
+      case DigitalService(name) => Map("digitalService" -> name)
 
     httpClientV2
-      .get(url"$url/api/test-jobs?teamName=${teamName.map(_.asString)}&digitalService=${digitalService.map(_.asString)}")
+      .get(url"$url/api/test-jobs?${params(metricFilter)}")
       .execute[Seq[JenkinsJob]]
-
 
 object TeamsAndRepositoriesConnector:
   case class TestJobResults(
@@ -92,7 +91,7 @@ object TeamsAndRepositoriesConnector:
     val reads: Reads[TestJobResults] =
       ( (__ \ "numAccessibilityViolations").readNullable[Int]
       ~ (__ \ "numSecurityAlerts"         ).readNullable[Int]
-      )(apply)
+      )(TestJobResults.apply)
 
   case class BuildData(
     result        : Option[String],
@@ -109,5 +108,4 @@ object TeamsAndRepositoriesConnector:
 
   object JenkinsJob:
     val reads: Reads[JenkinsJob] =
-      (__ \ "latestBuild").readNullable[BuildData](BuildData.reads)
-        .map(JenkinsJob.apply)
+      (__ \ "latestBuild").readNullable[BuildData](BuildData.reads).map(JenkinsJob.apply)

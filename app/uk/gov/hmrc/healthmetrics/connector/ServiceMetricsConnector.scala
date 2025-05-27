@@ -19,9 +19,8 @@ package uk.gov.hmrc.healthmetrics.connector
 import play.api.Configuration
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.{Reads, __}
-import play.api.mvc.QueryStringBindable
 import uk.gov.hmrc.healthmetrics.connector.ServiceMetricsConnector.ServiceMetric
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, Environment, LogMetricId, MetricFilter, TeamName}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpReads, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -47,24 +46,30 @@ class ServiceMetricsConnector @Inject() (
     
   private val logDuration: Duration =
     configuration.get[Duration]("service-metrics.logDuration")
-  
-  
+
   def metrics(
-    environment   : Option[String]    = None
-  , teamName      : Option[TeamName]       = None
-  , digitalService: Option[DigitalService] = None
-  )(using HeaderCarrier): Future[Seq[ServiceMetric]] =
+    metricFilter: MetricFilter
+  , environment : Environment
+  )(using
+    HeaderCarrier
+  ): Future[Seq[ServiceMetric]] =
     given Reads[ServiceMetric] = ServiceMetric.reads
+
     val from = Instant.now().minus(logDuration.toMillis, ChronoUnit.MILLIS)
+
+    val params: MetricFilter => Map[String, String] =
+      case TeamName(name)       => Map("team"           -> name)
+      case DigitalService(name) => Map("digitalService" -> name)
+
     httpClientV2
-      .get(url"$url/service-metrics/log-metrics?team=${teamName.map(_.asString)}&digitalService=${digitalService.map(_.asString)}&environment=${environment}&from=$from")
+      .get(url"$url/service-metrics/log-metrics?${params(metricFilter)}&environment=${environment.asString}&from=$from")
       .execute[Seq[ServiceMetric]]
 
 object ServiceMetricsConnector:
   case class ServiceMetric(
     service    : String
-  , id         : String
-  , environment: String
+  , id         : LogMetricId
+  , environment: Environment
   , kibanaLink : String
   , logCount   : Int
   )
@@ -72,19 +77,8 @@ object ServiceMetricsConnector:
   object ServiceMetric:
     val reads: Reads[ServiceMetric] =
       ( (__ \ "service"     ).read[String]
-      ~ (__ \ "id"          ).read[String]
-      ~ (__ \ "environment" ).read[String]
+      ~ (__ \ "id"          ).read[LogMetricId]
+      ~ (__ \ "environment" ).read[Environment]
       ~ (__ \ "kibanaLink"  ).read[String]
       ~ (__ \ "logCount"    ).read[Int]
       )(ServiceMetric.apply)
-
-//given Parser[LogMetricId] = Parser.parser(LogMetricId.values)
-
-//enum LogMetricId(
-//  override val asString: String,
-//  val displayString    : String
-//) extends FromString
-//  derives Reads, FormFormat, QueryStringBindable:
-//  case ContainerKills   extends LogMetricId(asString = "container-kills"   , displayString = "Container Kills"   )
-//  case NonIndexedQuery  extends LogMetricId(asString = "non-indexed-query" , displayString = "Non-indexed Queries" )
-//  case SlowRunningQuery extends LogMetricId(asString = "slow-running-query", displayString = "Slow Running Queries")

@@ -17,12 +17,11 @@
 package uk.gov.hmrc.healthmetrics.connector
 
 import play.api.libs.json.{Reads, __}
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, SlugInfoFlag, TeamName}
 import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
-import java.time.LocalDate
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -39,17 +38,20 @@ class VulnerabilitiesConnector @Inject() (
     servicesConfig.baseUrl("vulnerabilities")
 
   def vulnerabilityCounts(
-    flag          : String
-  , team          : Option[TeamName]       = None
-  , digitalService: Option[DigitalService] = None
+    metricFilter: MetricFilter
+  , flag        : SlugInfoFlag
   )(using
     HeaderCarrier
   ): Future[Seq[TotalVulnerabilityCount]] =
     given Reads[TotalVulnerabilityCount] = TotalVulnerabilityCount.reads
-    httpClientV2
-      .get(url"$url/vulnerabilities/api/reports/${flag}/counts?team=${team.map(_.asString)}&digitalService=${digitalService.map(_.asString)}")
-      .execute[Seq[TotalVulnerabilityCount]]
 
+    val params: MetricFilter => Map[String, String] =
+      case TeamName(name)       => Map("team"           -> name)
+      case DigitalService(name) => Map("digitalService" -> name)
+
+    httpClientV2
+      .get(url"$url/vulnerabilities/api/reports/${flag.asString}/counts?${params(metricFilter)}")
+      .execute[Seq[TotalVulnerabilityCount]]
 
 case class TotalVulnerabilityCount(
   actionRequired: Int

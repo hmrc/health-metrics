@@ -18,8 +18,8 @@ package uk.gov.hmrc.healthmetrics.connector
 
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.{JsError, JsObject, JsResult, JsString, JsSuccess, JsValue, Reads, __}
-import uk.gov.hmrc.healthmetrics.connector.ReleasesConnector.{Version, WhatsRunningWhere}
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, TeamName}
+import uk.gov.hmrc.healthmetrics.connector.ReleasesConnector.WhatsRunningWhere
+import uk.gov.hmrc.healthmetrics.model.{MetricFilter, TeamName, DigitalService}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpReads, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -39,14 +39,14 @@ class ReleasesConnector @Inject() (
 
   private given Reads[WhatsRunningWhere] = WhatsRunningWhere.reads
 
-  def releases(
-    teamName      : Option[TeamName]       = None
-  , digitalService: Option[DigitalService] = None
-  )(using HeaderCarrier): Future[Seq[WhatsRunningWhere]] =
-    httpClientV2
-      .get(url"$url/releases-api/whats-running-where?teamName=${teamName.map(_.asString)}&digitalService=${digitalService.map(_.asString)}")
-      .execute[Seq[WhatsRunningWhere]]
+  def releases(metricFilter: MetricFilter)(using HeaderCarrier): Future[Seq[WhatsRunningWhere]] =
+    val params: MetricFilter => Map[String, String] =
+      case TeamName(name)       => Map("teamName"       -> name)
+      case DigitalService(name) => Map("digitalService" -> name)
 
+    httpClientV2
+      .get(url"$url/releases-api/whats-running-where?${params(metricFilter)}")
+      .execute[Seq[WhatsRunningWhere]]
 
 object ReleasesConnector:
   case class Version(
@@ -86,8 +86,8 @@ object ReleasesConnector:
   end Version
   
   case class WhatsRunningWhereVersion(
-    environment: String,
-    version    : Version,
+    environment: String
+  , version    : Version
   )
   
   private object WhatsRunningWhereVersion:
@@ -102,5 +102,4 @@ object ReleasesConnector:
   object WhatsRunningWhere:
     val reads: Reads[WhatsRunningWhere] = 
       given Reads[WhatsRunningWhereVersion] = WhatsRunningWhereVersion.reads
-      (__ \ "versions").read[List[WhatsRunningWhereVersion]]
-        .map(WhatsRunningWhere.apply)
+      (__ \ "versions").read[List[WhatsRunningWhereVersion]].map(WhatsRunningWhere.apply)

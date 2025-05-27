@@ -17,9 +17,9 @@
 package uk.gov.hmrc.healthmetrics.connector
 
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
-import play.api.libs.json.{Format, Reads, __}
+import play.api.libs.json.{Reads, __}
 import uk.gov.hmrc.healthmetrics.connector.PlatformInitiativesConnector.PlatformInitiative
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, TeamName}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpReads, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -39,12 +39,13 @@ class PlatformInitiativesConnector @Inject()(
 
   private given Reads[PlatformInitiative] = PlatformInitiative.reads
 
-  def getInitiatives(
-    teamName      : Option[TeamName]       = None
-  , digitalService: Option[DigitalService] = None
-  )(using HeaderCarrier): Future[Seq[PlatformInitiative]] =
+  def getInitiatives(metricFilter: MetricFilter)(using HeaderCarrier): Future[Seq[PlatformInitiative]] =
+    val params: MetricFilter => Map[String, String] =
+      case TeamName(name)       => Map("teamName"       -> name)
+      case DigitalService(name) => Map("digitalService" -> name)
+
     httpClientV2
-      .get(url"$url/platform-initiatives/initiatives?teamName=${teamName.map(_.asString)}&digitalService=${digitalService.map(_.asString)}")
+      .get(url"$url/platform-initiatives/initiatives?${params(metricFilter)}")
       .execute[Seq[PlatformInitiative]]
 
 object PlatformInitiativesConnector:
@@ -67,5 +68,4 @@ object PlatformInitiativesConnector:
 
   object PlatformInitiative:
     val reads: Reads[PlatformInitiative] =
-      (__ \ "progress").read[Progress](Progress.reads)
-        .map(PlatformInitiative.apply)
+      (__ \ "progress").read[Progress](Progress.reads).map(PlatformInitiative.apply)

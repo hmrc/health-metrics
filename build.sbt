@@ -1,3 +1,4 @@
+import play.sbt.routes.RoutesKeys
 import uk.gov.hmrc.DefaultBuildSettings
 
 ThisBuild / majorVersion  := 0
@@ -13,6 +14,11 @@ lazy val microservice = Project("health-metrics", file("."))
   .settings(PlayKeys.playDefaultPort := 8862)
   .settings(resolvers += Resolver.jcenterRepo)
   .settings(CodeCoverageSettings.settings: _*)
+  .settings(RoutesKeys.routesImport  ++= Seq(
+    "uk.gov.hmrc.healthmetrics.util.Binders.given"
+  , "uk.gov.hmrc.healthmetrics.model.DigitalService"
+  , "uk.gov.hmrc.healthmetrics.model.TeamName"
+  ))
 
 lazy val it = project
   .enablePlugins(PlayScala)

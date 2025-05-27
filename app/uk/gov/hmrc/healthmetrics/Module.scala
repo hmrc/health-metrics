@@ -14,11 +14,15 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.healthmetrics.config
+package uk.gov.hmrc.healthmetrics
 
-import com.google.inject.AbstractModule
+import play.api.{Configuration, Environment}
+import play.api.inject.Binding
+import uk.gov.hmrc.healthmetrics.scheduler.HealthMetricsScheduler
 
-class Module extends AbstractModule:
+class Module extends play.api.inject.Module:
 
-  override def configure(): Unit =
-    bind(classOf[AppConfig]).asEagerSingleton()
+  override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
+    Seq(
+      bind[HealthMetricsScheduler].toSelf.eagerly()
+    )

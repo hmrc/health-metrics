@@ -32,8 +32,10 @@ package uk.gov.hmrc.healthmetrics.util
  * limitations under the License.
  */
 
-import play.api.libs.json.{JsError, JsString, JsSuccess, Reads, Writes}
-//import play.api.mvc.{PathBindable, QueryStringBindable}
+import play.api.libs.json.{JsError, JsString, JsSuccess, KeyWrites, Reads, Writes}
+import play.api.mvc.QueryStringBindable
+
+import scala.util.Try
 
 trait FromString { def asString: String }
 
@@ -63,13 +65,24 @@ object FromStringEnum:
       _.validate[String]
         .flatMap(Parser[A].parse(_).fold(JsError(_), JsSuccess(_)))
 
-//  extension (obj: PathBindable.type)
-//    def derived[A <: FromString : Parser]: PathBindable[A] =
-//      Binders.pathBindableFromString(Parser[A].parse, _.asString)
-//
-//  extension (obj: QueryStringBindable.type)
-//    def derived[A <: FromString : Parser]: QueryStringBindable[A] =
-//      Binders.queryStringBindableFromString(
-//        s => Some(Parser[A].parse(s)),
-//        _.asString
-//      )
+  extension (obj: KeyWrites.type)
+    // Ensures Map keys are serialised as strings, not arrays (Play's default for non-String keys)
+    def derived[K <: FromString]: KeyWrites[K] =
+      _.asString
+
+object Binders:
+  given QueryStringBindable[java.time.LocalDate] =
+    queryStringBindableFromString[java.time.LocalDate](
+      s => Some(Try(java.time.LocalDate.parse(s)).toEither.left.map(_.getMessage)),
+      _.toString
+    )
+
+  def queryStringBindableFromString[T](parse: String => Option[Either[String, T]], asString: T => String)(using strBinder: QueryStringBindable[String]): QueryStringBindable[T] =
+    new QueryStringBindable[T]:
+      override def bind(key: String, params: Map[String, Seq[String]]): Option[Either[String, T]] =
+        strBinder.bind(key, params) match
+          case Some(Right(s)) if s.trim.nonEmpty => parse(s.trim)
+          case _                                 => None
+
+      override def unbind(key: String, value: T): String =
+        strBinder.unbind(key, asString(value))

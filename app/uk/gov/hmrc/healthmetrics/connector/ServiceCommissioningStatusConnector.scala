@@ -19,7 +19,7 @@ package uk.gov.hmrc.healthmetrics.connector
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.{Reads, __}
 import uk.gov.hmrc.healthmetrics.connector.ServiceCommissioningStatusConnector.CachedServiceCheck
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, TeamName}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpReads, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -38,15 +38,15 @@ class ServiceCommissioningStatusConnector @Inject() (
   private val url: String =
     servicesConfig.baseUrl("service-commissioning-status")
     
-  def cachedCommissioningStatus(
-    teamName       : Option[TeamName]       = None
-  , digitalService : Option[DigitalService] = None
-  )(using
-    HeaderCarrier
-  ): Future[List[CachedServiceCheck]] =
+  def cachedCommissioningStatus(metricFilter: MetricFilter)(using HeaderCarrier): Future[List[CachedServiceCheck]] =
     given Reads[CachedServiceCheck] = CachedServiceCheck.reads
+
+    val params: MetricFilter => Map[String, String] =
+      case TeamName(name)       => Map("teamName"       -> name)
+      case DigitalService(name) => Map("digitalService" -> name)
+
     httpClientV2
-      .get(url"$url/service-commissioning-status/cached-status?teamName=${teamName.map(_.asString)}&digitalService=${digitalService.map(_.asString)}")
+      .get(url"$url/service-commissioning-status/cached-status?${params(metricFilter)}")
       .execute[List[CachedServiceCheck]]
     
 object ServiceCommissioningStatusConnector:
@@ -67,6 +67,4 @@ object ServiceCommissioningStatusConnector:
   object CachedServiceCheck:
     val reads: Reads[CachedServiceCheck] =
       given Reads[Warning] = Warning.reads
-      (__ \ "warnings").readNullable[Seq[Warning]]
-        .map(CachedServiceCheck.apply)
-      
+      (__ \ "warnings").readNullable[Seq[Warning]].map(CachedServiceCheck.apply)

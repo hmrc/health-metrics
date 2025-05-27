@@ -19,7 +19,7 @@ package uk.gov.hmrc.healthmetrics.connector
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.{Reads, __}
 import uk.gov.hmrc.healthmetrics.connector.LeakDetectionConnector.LeakDetectionRepositorySummary
-import uk.gov.hmrc.healthmetrics.model.TeamName
+import uk.gov.hmrc.healthmetrics.model.{MetricFilter, TeamName, DigitalService}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpReads, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -34,22 +34,26 @@ class LeakDetectionConnector @Inject() (
 )(using ec: ExecutionContext):
   
   import uk.gov.hmrc.http.HttpReads.Implicits._
-  
+
   private val url: String = 
     servicesConfig.baseUrl("leak-detection")
 
   def leakDetectionRepoSummaries(
-    team            : Option[TeamName],
-    digitalService  : Option[String],
-    includeNonIssues: Boolean,
-    includeBranches : Boolean
+    metricFilter    : MetricFilter
+  , includeNonIssues: Boolean = false
+  , includeBranches : Boolean = false
   )(using
      HeaderCarrier
   ): Future[Seq[LeakDetectionRepositorySummary]] =
     given Reads[LeakDetectionRepositorySummary] = LeakDetectionRepositorySummary.reads
     val excludeNonIssues = !includeNonIssues
+
+    val params: MetricFilter => Map[String, String] =
+      case TeamName(name)       => Map("team"           -> name)
+      case DigitalService(name) => Map("digitalService" -> name)
+
     httpClientV2
-      .get(url"$url/api/repositories/summary?team=${team.map(_.asString)}&digitalService=$digitalService&excludeNonIssues=$excludeNonIssues&includeBranches=$includeBranches")
+      .get(url"$url/api/repositories/summary?${params(metricFilter)}&excludeNonIssues=$excludeNonIssues&includeBranches=$includeBranches")
       .execute[Seq[LeakDetectionRepositorySummary]]
     
 object LeakDetectionConnector:
