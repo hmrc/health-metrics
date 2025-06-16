@@ -56,7 +56,7 @@ object ServiceCommissioningStatusConnector:
   , message: String
   )
   
-  private object Warning:
+  object Warning:
     val reads: Reads[Warning] =
       ( (__ \ "title"  ).read[String]
       ~ (__ \ "message").read[String]

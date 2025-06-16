@@ -29,8 +29,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class TeamsAndRepositoriesConnector @Inject()(
-  servicesConfig: ServicesConfig,
   httpClientV2  : HttpClientV2
+, servicesConfig: ServicesConfig
 )(using
   ExecutionContext
 ):
@@ -46,12 +46,13 @@ class TeamsAndRepositoriesConnector @Inject()(
      .get(url"$url/api/v2/teams")
      .execute[Seq[TeamName]]
 
-  def allDigitalServices()(using HeaderCarrier): Future[Seq[String]] =
+  def allDigitalServices()(using HeaderCarrier): Future[Seq[DigitalService]] =
+    given Reads[DigitalService] = DigitalService.reads
     httpClientV2
       .get(url"$url/api/v2/digital-services")
-      .execute[Seq[String]]  
+      .execute[Seq[DigitalService]]
 
-  
+
   def openPullRequestsForReposOwnedByTeam(team: TeamName)(using HeaderCarrier): Future[Int] =
     httpClientV2
       .get(url"$url/api/open-pull-requests?reposOwnedByTeam=${team.asString}")
@@ -87,7 +88,7 @@ object TeamsAndRepositoriesConnector:
   , numSecurityAlerts          : Option[Int]
   )
 
-  private object TestJobResults:
+  object TestJobResults:
     val reads: Reads[TestJobResults] =
       ( (__ \ "numAccessibilityViolations").readNullable[Int]
       ~ (__ \ "numSecurityAlerts"         ).readNullable[Int]
@@ -98,7 +99,7 @@ object TeamsAndRepositoriesConnector:
     testJobResults: Option[TestJobResults] = None
   )
 
-  private object BuildData:
+  object BuildData:
     val reads: Reads[BuildData] =
       ( (__ \ "result"        ).readNullable[String]
       ~ (__ \ "testJobResults").readNullable[TestJobResults](TestJobResults.reads)

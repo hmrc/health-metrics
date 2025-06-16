@@ -45,7 +45,9 @@ class TeamHealthMetricsRepository @Inject()(
 , extraCodecs    = Seq(Codecs.playFormatCodec(summon[Format[TeamName]]))
 ):
 
-  val getMaxDate: Future[Option[LocalDate]] =
+  override lazy val requiresTtlIndex = false
+
+  def getMaxDate(): Future[Option[LocalDate]] =
     collection
       .find()
       .sort(descending("date"))
@@ -69,5 +71,4 @@ class TeamHealthMetricsRepository @Inject()(
         , Filters.gte("date", from)
         , Filters.lt("date", to)
         )
-      )
-      .toFuture()
+      ).toFuture()

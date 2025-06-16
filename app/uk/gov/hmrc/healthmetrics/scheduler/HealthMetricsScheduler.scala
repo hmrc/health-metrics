@@ -59,7 +59,7 @@ class HealthMetricsScheduler @Inject()(
     lock            = ScheduledLockService(lockRepository, "metrics-scheduler", timestampSupport, schedulerConfig.interval)
   ):
     for
-      latestRecordedDate <- teamHealthMetricsRepository.getMaxDate
+      latestRecordedDate <- teamHealthMetricsRepository.getMaxDate()
       currentDate        =  java.time.LocalDate.now()
       result             <- latestRecordedDate match
                               case Some(date) if date == currentDate

@@ -62,7 +62,7 @@ object ReleasesConnector:
     override def toString: String =
       original
 
-  private object Version:
+  object Version:
     given Ordering[Version] =
       Ordering.by: v =>
         (v.major, v.minor, v.patch)
@@ -90,7 +90,7 @@ object ReleasesConnector:
   , version    : Version
   )
   
-  private object WhatsRunningWhereVersion:
+  object WhatsRunningWhereVersion:
     val reads: Reads[WhatsRunningWhereVersion] =
       ( (__ \ "environment"  ).read[String]
       ~ (__ \ "versionNumber").read[Version](Version.reads)

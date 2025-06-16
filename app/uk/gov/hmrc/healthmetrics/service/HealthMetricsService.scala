@@ -18,8 +18,7 @@ package uk.gov.hmrc.healthmetrics.service
 
 import cats.implicits.*
 import uk.gov.hmrc.healthmetrics.connector.{LeakDetectionConnector, PlatformInitiativesConnector, ReleasesConnector, ServiceCommissioningStatusConnector, ServiceDependenciesConnector, ServiceMetricsConnector, ShutterConnector, TeamsAndRepositoriesConnector, VulnerabilitiesConnector}
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, Environment, HealthMetric, LogMetricId, MetricFilter, ShutterStatusValue, ShutterType, SlugInfoFlag, TeamHealthMetricsHistory, TeamName}
-import uk.gov.hmrc.healthmetrics.persistence.TeamHealthMetricsRepository
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, Environment, HealthMetric, LogMetricId, MetricFilter, ShutterStatusValue, ShutterType, SlugInfoFlag, TeamName}
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.LocalDate
@@ -40,7 +39,7 @@ class HealthMetricsService @Inject()(
 )(using
   ExecutionContext
 ):
-  
+
   private[service] def sequence(m: Map[HealthMetric, Future[Int]]): Future[Map[HealthMetric, Int]] =
     m.toSeq.map((k, v) => v.map(k -> _)).sequence.map(_.toMap)
 
@@ -149,7 +148,7 @@ class HealthMetricsService @Inject()(
         (wrw.versions.maxBy(_.version), wrw.versions.find(_.environment == Environment.Production.asString)) match
           case (v1, Some(v2)) if v2.version.patch > 0
                               || v2.version.major < v1.version.major
-                              || v2.version.minor <= v1.version.minor - 1
+                              || v2.version.minor < v1.version.minor
                               => 1
           case _              => 0
       ).map(_.sum)

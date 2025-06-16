@@ -58,7 +58,7 @@ object PlatformInitiativesConnector:
       then 0
       else (current.toFloat / target.toFloat * 100).toInt
 
-  private object Progress:
+  object Progress:
     val reads: Reads[Progress] =
       ( (__ \ "current").read[Int]
       ~ (__ \ "target" ).read[Int]

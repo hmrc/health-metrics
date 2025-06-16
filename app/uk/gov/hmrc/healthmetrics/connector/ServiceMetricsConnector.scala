@@ -25,7 +25,7 @@ import uk.gov.hmrc.http.{HeaderCarrier, HttpReads, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
-import java.time.Instant
+import java.time.{Clock, Instant}
 import java.time.temporal.ChronoUnit
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -36,6 +36,7 @@ class ServiceMetricsConnector @Inject() (
   httpClientV2  : HttpClientV2
 , servicesConfig: ServicesConfig
 , configuration : Configuration
+, clock         : Clock = Clock.systemDefaultZone()
 )(using
   ec: ExecutionContext
 ):
@@ -55,7 +56,7 @@ class ServiceMetricsConnector @Inject() (
   ): Future[Seq[ServiceMetric]] =
     given Reads[ServiceMetric] = ServiceMetric.reads
 
-    val from = Instant.now().minus(logDuration.toMillis, ChronoUnit.MILLIS)
+    val from = Instant.now(clock).minus(logDuration.toMillis, ChronoUnit.MILLIS)
 
     val params: MetricFilter => Map[String, String] =
       case TeamName(name)       => Map("team"           -> name)

@@ -49,7 +49,9 @@ package object model:
 
   case class DigitalService(asString: String) extends AnyVal
 
-  object DigitalService extends StringAnyValUtils(DigitalService.apply, _.asString)
+  object DigitalService extends StringAnyValUtils(DigitalService.apply, _.asString):
+    val reads: Reads[DigitalService] =
+      Reads.of[String].map(DigitalService.apply)
 
   import FromStringEnum._
 

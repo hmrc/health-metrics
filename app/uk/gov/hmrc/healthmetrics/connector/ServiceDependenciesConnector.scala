@@ -61,7 +61,7 @@ object ServiceDependenciesConnector:
   , exempt: Boolean
   )
   
-  private object Violation:
+  object Violation:
     val reads: Reads[Violation] =
       ( (__ \ "from"  ).read[LocalDate]
       ~ (__ \ "exempt").read[Boolean]
@@ -73,4 +73,3 @@ object ServiceDependenciesConnector:
     val reads: Reads[BobbyReport] =
       given Reads[Violation] = Violation.reads
       (__ \ "violations").read[Seq[Violation]].map(BobbyReport.apply)
-  
