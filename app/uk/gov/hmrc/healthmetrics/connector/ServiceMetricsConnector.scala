@@ -36,7 +36,7 @@ class ServiceMetricsConnector @Inject() (
   httpClientV2  : HttpClientV2
 , servicesConfig: ServicesConfig
 , configuration : Configuration
-, clock         : Clock = Clock.systemDefaultZone()
+, clock         : Clock
 )(using
   ec: ExecutionContext
 ):

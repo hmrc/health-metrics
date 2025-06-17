@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.healthmetrics
 
-import play.api.mvc.QueryStringBindable
+import play.api.mvc.{PathBindable, QueryStringBindable}
 import play.api.libs.functional.syntax.*
 import play.api.libs.json.{Format, Reads, __}
 import uk.gov.hmrc.healthmetrics.util.{Binders, FromString, FromStringEnum, Parser}
@@ -36,6 +36,12 @@ package object model:
       Binders.queryStringBindableFromString(
         s => Some(Right(fromString(s))),
         toString
+      )
+      
+    given PathBindable[T] =
+      Binders.pathBindableFromString(
+        s => Right(fromString(s))
+      , toString
       )
   end StringAnyValUtils
   

@@ -31,27 +31,27 @@ enum HealthMetric(
   override val asString: String
 ) extends FromString
   derives Reads, Writes:
-  case OpenPRRaisedByMembersOfTeam             extends HealthMetric(asString = "OPEN_PR_RAISED_BY_MEMBERS_OF_TEAM"           )
-  case OpenPRForReposOwnedByTeam               extends HealthMetric(asString = "OPEN_PR_FOR_REPOS_OWNED_BY_TEAM"             )
-  case OpenPRForReposOwnedByDigitalService     extends HealthMetric(asString = "OPEN_PR_FOR_REPOS_OWNED_BY_DIGITAL_SERVICE"  )
-  case LeakDetectionSummaries                  extends HealthMetric(asString = "LEAK_DETECTION_SUMMARIES"                    )
-  case ProductionBobbyErrors                   extends HealthMetric(asString = "PRODUCTION_BOBBY_ERRORS"                     )
-  case LatestBobbyErrors                       extends HealthMetric(asString = "LATEST_BOBBY_ERRORS"                         )
-  case ProductionBobbyWarnings                 extends HealthMetric(asString = "PRODUCTION_BOBBY_WARNINGS"                   )
-  case LatestBobbyWarnings                     extends HealthMetric(asString = "LATEST_BOBBY_WARNINGS"                       )
-  case FrontendShutterStates                   extends HealthMetric(asString = "FRONTEND_SHUTTER_STATES"                     )
-  case ApiShutterStates                        extends HealthMetric(asString = "API_SHUTTER_STATES"                          )
-  case PlatformInitiatives                     extends HealthMetric(asString = "PLATFORM_INITIATIVES"                        )
-  case ProductionActionRequiredVulnerabilities extends HealthMetric(asString = "PRODUCTION_ACTION_REQUIRED_VULNERABILITIES"  )
-  case LatestActionRequiredVulnerabilities     extends HealthMetric(asString = "LATEST_ACTION_REQUIRED_VULNERABILITIES"      )
-  case ServiceCommissioningStateWarnings       extends HealthMetric(asString = "SERVICE_COMMISSIONING_STATE_WARNINGS"        )
-  case ContainerKills                          extends HealthMetric(asString = "CONTAINER_KILLS"                             )
-  case NonIndexedQueries                       extends HealthMetric(asString = "NON_INDEXED_QUERIES"                         )
-  case SlowRunningQueries                      extends HealthMetric(asString = "SLOW_RUNNING_QUERIES"                        )
-  case OutdatedOrHotFixedProductionDeployments extends HealthMetric(asString = "OUTDATED_OR_HOT_FIXED_PRODUCTION_DEPLOYMENTS")
-  case TestFailures                            extends HealthMetric(asString = "TEST_FAILURES"                               )
-  case AccessibilityAssessmentViolations       extends HealthMetric(asString = "ACCESSIBILITY_ASSESSMENT_VIOLATIONS"         )
-  case SecurityAssessmentAlerts                extends HealthMetric(asString = "SECURITY_ASSESSMENT_ALERTS"                  )
+  case OpenPRRaisedByMembersOfTeam             extends HealthMetric("OPEN_PR_RAISED_BY_MEMBERS_OF_TEAM"           )
+  case OpenPRForReposOwnedByTeam               extends HealthMetric("OPEN_PR_FOR_REPOS_OWNED_BY_TEAM"             )
+  case OpenPRForReposOwnedByDigitalService     extends HealthMetric("OPEN_PR_FOR_REPOS_OWNED_BY_DIGITAL_SERVICE"  )
+  case LeakDetectionSummaries                  extends HealthMetric("LEAK_DETECTION_SUMMARIES"                    )
+  case ProductionBobbyErrors                   extends HealthMetric("PRODUCTION_BOBBY_ERRORS"                     )
+  case LatestBobbyErrors                       extends HealthMetric("LATEST_BOBBY_ERRORS"                         )
+  case ProductionBobbyWarnings                 extends HealthMetric("PRODUCTION_BOBBY_WARNINGS"                   )
+  case LatestBobbyWarnings                     extends HealthMetric("LATEST_BOBBY_WARNINGS"                       )
+  case FrontendShutterStates                   extends HealthMetric("FRONTEND_SHUTTER_STATES"                     )
+  case ApiShutterStates                        extends HealthMetric("API_SHUTTER_STATES"                          )
+  case PlatformInitiatives                     extends HealthMetric("PLATFORM_INITIATIVES"                        )
+  case ProductionActionRequiredVulnerabilities extends HealthMetric("PRODUCTION_ACTION_REQUIRED_VULNERABILITIES"  )
+  case LatestActionRequiredVulnerabilities     extends HealthMetric("LATEST_ACTION_REQUIRED_VULNERABILITIES"      )
+  case ServiceCommissioningStateWarnings       extends HealthMetric("SERVICE_COMMISSIONING_STATE_WARNINGS"        )
+  case ContainerKills                          extends HealthMetric("CONTAINER_KILLS"                             )
+  case NonIndexedQueries                       extends HealthMetric("NON_INDEXED_QUERIES"                         )
+  case SlowRunningQueries                      extends HealthMetric("SLOW_RUNNING_QUERIES"                        )
+  case OutdatedOrHotFixedProductionDeployments extends HealthMetric("OUTDATED_OR_HOT_FIXED_PRODUCTION_DEPLOYMENTS")
+  case TestFailures                            extends HealthMetric("TEST_FAILURES"                               )
+  case AccessibilityAssessmentViolations       extends HealthMetric("ACCESSIBILITY_ASSESSMENT_VIOLATIONS"         )
+  case SecurityAssessmentAlerts                extends HealthMetric("SECURITY_ASSESSMENT_ALERTS"                  )
 
 
 case class LatestHealthMetrics(metrics: Map[HealthMetric, Int])
@@ -69,17 +69,16 @@ case class TeamHealthMetricsHistory(
 )
 
 object TeamHealthMetricsHistory:
-  given Format[LocalDate]       = MongoJavatimeFormats.localDateFormat
   given KeyWrites[HealthMetric] = KeyWrites.derived
 
-  val format: Format[TeamHealthMetricsHistory] =
+  val mongoFormat: Format[TeamHealthMetricsHistory] =
     ( (__ \ "teamName").format[TeamName]
-    ~ (__ \ "date"    ).format[LocalDate]
+    ~ (__ \ "date"    ).format[LocalDate](MongoJavatimeFormats.localDateFormat)
     ~ (__ \ "metrics" ).format[Map[HealthMetric, Int]]
     )(TeamHealthMetricsHistory.apply, pt => Tuple.fromProductTyped(pt))
 
   val apiWrites: Writes[TeamHealthMetricsHistory] =
     ( (__ \ "teamName").write[TeamName]
-    ~ (__ \ "date"    ).write[String].contramap(_.toString)
+    ~ (__ \ "date"    ).write[LocalDate]
     ~ (__ \ "metrics" ).write[Map[HealthMetric, Int]]
     )(pt => Tuple.fromProductTyped(pt))

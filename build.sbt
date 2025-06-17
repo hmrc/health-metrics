@@ -2,7 +2,7 @@ import play.sbt.routes.RoutesKeys
 import uk.gov.hmrc.DefaultBuildSettings
 
 ThisBuild / majorVersion  := 0
-ThisBuild / scalaVersion  := "3.3.4"
+ThisBuild / scalaVersion  := "3.3.6"
 ThisBuild / scalacOptions += "-Wconf:msg=Flag.*repeatedly:s"
 
 lazy val microservice = Project("health-metrics", file("."))
@@ -12,8 +12,6 @@ lazy val microservice = Project("health-metrics", file("."))
     scalacOptions += "-Wconf:src=routes/.*:s",
   )
   .settings(PlayKeys.playDefaultPort := 8862)
-  .settings(resolvers += Resolver.jcenterRepo)
-  .settings(CodeCoverageSettings.settings: _*)
   .settings(RoutesKeys.routesImport  ++= Seq(
     "uk.gov.hmrc.healthmetrics.util.Binders.given"
   , "uk.gov.hmrc.healthmetrics.model.DigitalService"

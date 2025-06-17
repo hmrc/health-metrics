@@ -37,7 +37,7 @@ class TeamHealthMetricsRepository @Inject()(
 ) extends PlayMongoRepository(
   mongoComponent = mongoComponent
 , collectionName = "teamHealthMetrics"
-, domainFormat   = TeamHealthMetricsHistory.format
+, domainFormat   = TeamHealthMetricsHistory.mongoFormat
 , indexes        = Seq(
                     IndexModel(Indexes.ascending("teamName" ))
                   , IndexModel(Indexes.ascending("date"))

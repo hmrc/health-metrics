@@ -33,7 +33,7 @@ package uk.gov.hmrc.healthmetrics.util
  */
 
 import play.api.libs.json.{JsError, JsString, JsSuccess, KeyWrites, Reads, Writes}
-import play.api.mvc.QueryStringBindable
+import play.api.mvc.{PathBindable, QueryStringBindable}
 
 import scala.util.Try
 
@@ -50,6 +50,7 @@ object Parser:
         .toRight(s"Invalid value: \"$s\" - should be one of: ${values.map(_.asString).mkString(", ")}")
 
   @inline def apply[T](using instance: Parser[T]): Parser[T] = instance
+end Parser
 
 object FromStringEnum:
   extension (obj: Ordering.type)
@@ -69,6 +70,7 @@ object FromStringEnum:
     // Ensures Map keys are serialised as strings, not arrays (Play's default for non-String keys)
     def derived[K <: FromString]: KeyWrites[K] =
       _.asString
+end FromStringEnum
 
 object Binders:
   given QueryStringBindable[java.time.LocalDate] =
@@ -85,4 +87,15 @@ object Binders:
           case _                                 => None
 
       override def unbind(key: String, value: T): String =
-        strBinder.unbind(key, asString(value))
+        asString(value)
+
+    /** `summon[PathBindable[String]].transform` doesn't allow us to provide failures.
+   * This function provides `andThen` semantics
+   */
+  def pathBindableFromString[T](parse: String => Either[String, T], asString: T => String)(using strBinder: PathBindable[String]): PathBindable[T] =
+    new PathBindable[T]:
+      override def bind(key: String, value: String): Either[String, T] =
+        parse(value)
+
+      override def unbind(key: String, value: T): String =
+        asString(value)
