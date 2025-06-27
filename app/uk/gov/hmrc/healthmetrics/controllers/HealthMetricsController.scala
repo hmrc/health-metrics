@@ -19,7 +19,7 @@ package uk.gov.hmrc.healthmetrics.controllers
 import play.api.Logging
 import play.api.libs.json.{Json, Writes}
 import play.api.mvc.{Action, AnyContent, ControllerComponents, RequestHeader}
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, LatestHealthMetrics, TeamHealthMetricsHistory, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, HealthMetric, HealthMetricTimelineCount, LatestHealthMetrics, TeamName}
 import uk.gov.hmrc.healthmetrics.persistence.TeamHealthMetricsRepository
 import uk.gov.hmrc.healthmetrics.service.HealthMetricsService
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
@@ -57,14 +57,15 @@ class HealthMetricsController @Inject()(
         .map: metrics =>
           Ok(Json.toJson(LatestHealthMetrics(metrics)))
 
-  def teamHealthMetrics(
-    team: TeamName
-  , from: LocalDate
-  , to  : LocalDate
+  def healthMetricsTimelineCounts(
+    team        : TeamName
+  , healthMetric: HealthMetric
+  , from        : LocalDate
+  , to          : LocalDate
   ): Action[AnyContent] =
      Action.async: request =>
-       given Writes[TeamHealthMetricsHistory] = TeamHealthMetricsHistory.apiWrites
+       given Writes[HealthMetricTimelineCount] = HealthMetricTimelineCount.apiWrites
        teamHealthMetricsRepository
-         .getHealthMetrics(team, from, to)
+         .getHealthMetricTimelineCounts(team, healthMetric, from, to)
          .map: metrics =>
            Ok(Json.toJson(metrics))

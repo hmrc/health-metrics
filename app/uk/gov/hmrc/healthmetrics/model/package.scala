@@ -59,7 +59,7 @@ package object model:
     val reads: Reads[DigitalService] =
       Reads.of[String].map(DigitalService.apply)
 
-  import FromStringEnum._
+  import FromStringEnum.*
 
   given Parser[Environment] = Parser.parser(Environment.values)
 

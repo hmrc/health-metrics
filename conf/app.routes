@@ -1,6 +1,7 @@
 # microservice specific routes
 
 GET        /teams/:team/health-metrics/latest                       uk.gov.hmrc.healthmetrics.controllers.HealthMetricsController.latestTeamHealthMetrics(team: TeamName)
-GET        /teams/:team/health-metrics/history                      uk.gov.hmrc.healthmetrics.controllers.HealthMetricsController.teamHealthMetrics(team: TeamName, from: java.time.LocalDate, to: java.time.LocalDate)
 
 GET        /digital-services/:digitalService/health-metrics/latest  uk.gov.hmrc.healthmetrics.controllers.HealthMetricsController.latestDigitalServiceHealthMetrics(digitalService: DigitalService)
+
+GET        /timeline                                                uk.gov.hmrc.healthmetrics.controllers.HealthMetricsController.healthMetricsTimelineCounts(team: TeamName, healthMetric: HealthMetric, from: java.time.LocalDate, to: java.time.LocalDate)

@@ -77,9 +77,9 @@ class HealthMetricsService @Inject()(
   private def openPRMetrics(metricFilter: MetricFilter)(using HeaderCarrier): Future[Map[HealthMetric, Int]] =
     sequence(
       metricFilter match
-        case digi: DigitalService => Map(HealthMetric.OpenPRForReposOwnedByDigitalService -> teamsAndRepositoriesConnector.openPullRequestsForReposOwnedByDigitalService(digi))
+        case digi: DigitalService => Map(HealthMetric.OpenPRForOwnedRepos       -> teamsAndRepositoriesConnector.openPullRequestsForReposOwnedByDigitalService(digi))
         case team: TeamName       => Map(
-                                       HealthMetric.OpenPRForReposOwnedByTeam   -> teamsAndRepositoriesConnector.openPullRequestsForReposOwnedByTeam(team)
+                                       HealthMetric.OpenPRForOwnedRepos         -> teamsAndRepositoriesConnector.openPullRequestsForReposOwnedByTeam(team)
                                      , HealthMetric.OpenPRRaisedByMembersOfTeam -> teamsAndRepositoriesConnector.openPullRequestsRaisedByMembersOfTeam(team)
                                      )
     )

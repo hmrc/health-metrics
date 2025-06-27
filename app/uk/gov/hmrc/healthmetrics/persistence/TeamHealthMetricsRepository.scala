@@ -18,10 +18,12 @@ package uk.gov.hmrc.healthmetrics.persistence
 
 import org.mongodb.scala.ObservableFuture
 import org.mongodb.scala.SingleObservableFuture
+import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Indexes.descending
-import org.mongodb.scala.model.{Filters, IndexModel, Indexes}
+import org.mongodb.scala.model.{Filters, IndexModel, Indexes, Sorts}
+import org.mongodb.scala.model.Aggregates.{`match`, project, sort}
 import play.api.libs.json.Format
-import uk.gov.hmrc.healthmetrics.model.{TeamHealthMetricsHistory, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{HealthMetric, HealthMetricTimelineCount, TeamHealthMetricsHistory, TeamName}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.{Codecs, PlayMongoRepository}
 
@@ -39,10 +41,13 @@ class TeamHealthMetricsRepository @Inject()(
 , collectionName = "teamHealthMetrics"
 , domainFormat   = TeamHealthMetricsHistory.mongoFormat
 , indexes        = Seq(
-                    IndexModel(Indexes.ascending("teamName" ))
-                  , IndexModel(Indexes.ascending("date"))
-                  )
-, extraCodecs    = Seq(Codecs.playFormatCodec(summon[Format[TeamName]]))
+                     IndexModel(Indexes.ascending("teamName"))
+                   , IndexModel(Indexes.ascending("date"    ))
+                   )
+, extraCodecs    = Seq(
+                     Codecs.playFormatCodec(summon[Format[TeamName]]             )
+                   , Codecs.playFormatCodec(HealthMetricTimelineCount.mongoFormat)
+                   )
 ):
 
   override lazy val requiresTtlIndex = false
@@ -59,16 +64,27 @@ class TeamHealthMetricsRepository @Inject()(
   def insertMany(metrics: Seq[TeamHealthMetricsHistory]): Future[Unit] =
     collection.insertMany(metrics).toFuture().map(_ => ())
 
-  def getHealthMetrics(
-    teamName: TeamName
-  , from    : LocalDate
-  , to      : LocalDate
-  ): Future[Seq[TeamHealthMetricsHistory]] =
+  def getHealthMetricTimelineCounts(
+    teamName    : TeamName
+  , healthMetric: HealthMetric
+  , from        : LocalDate
+  , to          : LocalDate
+  ): Future[Seq[HealthMetricTimelineCount]] =
     collection
-      .find(
-        Filters.and(
-          Filters.equal("teamName", teamName)
-        , Filters.gte("date", from)
-        , Filters.lt("date", to)
+      .aggregate[HealthMetricTimelineCount]:
+        Seq(
+          `match`:
+            Filters.and(
+              Filters.equal("teamName", teamName)
+            , Filters.gte("date", from)
+            , Filters.lt("date", to)
+            )
+        , project:
+            BsonDocument(
+              "date"  -> 1
+            , "count" -> s"$$metrics.${healthMetric.asString}"
+            )
+        , sort:
+            Sorts.ascending("date")
         )
-      ).toFuture()
+      .toFuture()

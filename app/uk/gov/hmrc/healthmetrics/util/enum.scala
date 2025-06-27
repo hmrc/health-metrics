@@ -70,6 +70,13 @@ object FromStringEnum:
     // Ensures Map keys are serialised as strings, not arrays (Play's default for non-String keys)
     def derived[K <: FromString]: KeyWrites[K] =
       _.asString
+      
+  extension (obj: QueryStringBindable.type)
+    def derived[A <: FromString : Parser]: QueryStringBindable[A] =
+      Binders.queryStringBindableFromString(
+        s => Some(Parser[A].parse(s)),
+        _.asString
+      )
 end FromStringEnum
 
 object Binders:
