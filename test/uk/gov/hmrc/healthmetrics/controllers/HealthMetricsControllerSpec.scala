@@ -27,7 +27,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import play.api.libs.json.Json
 import play.api.test.Helpers.*
 import play.api.test.{FakeRequest, Helpers}
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, HealthMetric, HealthMetricTimelineCount, TeamHealthMetricsHistory, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, HealthMetric, HealthMetricTimelineCount, TeamName}
 import uk.gov.hmrc.healthmetrics.persistence.TeamHealthMetricsRepository
 import uk.gov.hmrc.healthmetrics.service.HealthMetricsService
 import uk.gov.hmrc.http.HeaderCarrier

@@ -57,8 +57,7 @@ class TeamHealthMetricsRepository @Inject()(
       .find()
       .sort(descending("date"))
       .limit(1)
-      .first()
-      .toFutureOption()
+      .headOption()
       .map(_.map(_.date))
 
   def insertMany(metrics: Seq[TeamHealthMetricsHistory]): Future[Unit] =
