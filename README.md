@@ -1,7 +1,7 @@
 
 # health-metrics
 
-This is a placeholder README.md for a new repository
+Service that gathers and exposes health metrics for teams and digital services on MDTP.
 
 ### License
 

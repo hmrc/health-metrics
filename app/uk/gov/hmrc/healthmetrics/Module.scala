@@ -14,11 +14,18 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.healthmetrics.config
+package uk.gov.hmrc.healthmetrics
 
-import javax.inject.{Inject, Singleton}
-import play.api.Configuration
+import play.api.{Configuration, Environment}
+import play.api.inject.Binding
+import uk.gov.hmrc.healthmetrics.scheduler.HealthMetricsScheduler
 
-@Singleton
-class AppConfig @Inject()(config: Configuration):
-  val appName: String = config.get[String]("appName")
+import java.time.Clock
+
+class Module extends play.api.inject.Module:
+
+  override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
+    Seq(
+      bind[HealthMetricsScheduler].toSelf.eagerly()
+    , bind[Clock].toInstance(Clock.systemDefaultZone)
+    )
