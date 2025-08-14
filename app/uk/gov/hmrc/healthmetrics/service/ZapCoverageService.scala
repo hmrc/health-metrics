@@ -44,6 +44,8 @@ class ZapCoverageService @Inject()(
       val uncoveredPaths = pathsWithMatches.filter(_.matches.isEmpty).map(_.path)
 
       ZapCoverageResult(
+        service            = request.serviceName,
+        version            = request.version,
         totalRoutes        = pathsWithRegex.length,
         coveredRoutes      = coveredPaths.length,
         coveragePercentage = if (pathsWithRegex.nonEmpty) then

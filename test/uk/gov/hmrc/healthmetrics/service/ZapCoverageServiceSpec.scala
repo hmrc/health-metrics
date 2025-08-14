@@ -83,6 +83,8 @@ class ZapCoverageServiceSpec
 
       val expected =
         ZapCoverageResult(
+          service            = "test-service",
+          version            = "0.1.0",
           totalRoutes        = 8,
           coveredRoutes      = 6,
           coveragePercentage = BigDecimal(75.0),

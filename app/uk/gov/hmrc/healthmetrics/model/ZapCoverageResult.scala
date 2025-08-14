@@ -20,6 +20,8 @@ import play.api.libs.json.{Writes, __}
 import play.api.libs.functional.syntax.*
 
 case class ZapCoverageResult(
+  service           : String,
+  version           : String,
   totalRoutes       : Int,
   coveredRoutes     : Int,
   coveragePercentage: BigDecimal,
@@ -40,7 +42,9 @@ object ZapCoverageResult:
     )(pwm => Tuple.fromProductTyped(pwm))
 
   val writes: Writes[ZapCoverageResult] =
-    ( (__ \ "totalRoutes"       ).write[Int]
+    ( (__ \ "service"           ).write[String]
+    ~ (__ \ "version"           ).write[String]
+    ~ (__ \ "totalRoutes"       ).write[Int]
     ~ (__ \ "coveredRoutes"     ).write[Int]
     ~ (__ \ "coveragePercentage").write[BigDecimal]
     ~ (__ \ "matches"           ).write[Seq[PathWithMatches]]
