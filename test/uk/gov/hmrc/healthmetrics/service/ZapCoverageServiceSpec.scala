@@ -97,7 +97,8 @@ class ZapCoverageServiceSpec
           uncoveredPaths     = Seq(
             "/test-service/dashboard",
             "/test-service/faq"
-          )
+          ),
+          publicPrefixes = Seq("/test-service")
         )
 
       private given HeaderCarrier = HeaderCarrier()

@@ -20,11 +20,12 @@ import play.api.libs.json.{Writes, __}
 import play.api.libs.functional.syntax.*
 
 case class ZapCoverageResult(
-  totalRoutes: Int,
-  coveredRoutes: Int,
+  totalRoutes       : Int,
+  coveredRoutes     : Int,
   coveragePercentage: BigDecimal,
-  matches: Seq[ZapCoverageResult.PathWithMatches],
-  uncoveredPaths: Seq[String]
+  matches           : Seq[ZapCoverageResult.PathWithMatches],
+  uncoveredPaths    : Seq[String],
+  publicPrefixes    : Seq[String]
 )
 
 object ZapCoverageResult:
@@ -44,4 +45,5 @@ object ZapCoverageResult:
     ~ (__ \ "coveragePercentage").write[BigDecimal]
     ~ (__ \ "matches"           ).write[Seq[PathWithMatches]]
     ~ (__ \ "uncoveredPaths"    ).write[Seq[String]]
+    ~ (__ \ "publicPrefixes"    ).write[Seq[String]]
     )(zcr => Tuple.fromProductTyped(zcr))

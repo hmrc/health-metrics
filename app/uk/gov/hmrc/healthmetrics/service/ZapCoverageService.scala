@@ -32,8 +32,8 @@ class ZapCoverageService @Inject()(
 ) extends Logging:
 
   def calculateZapCoverage(request: ZapCoverageRequest)(using HeaderCarrier): Future[ZapCoverageResult] =
-    getPublicPaths(request.serviceName, request.version).map: paths =>
-      val pathsWithRegex = paths.distinct.map: path =>
+    getPublicPaths(request.serviceName, request.version).map: pathsWithPrefixes =>
+      val pathsWithRegex = pathsWithPrefixes.paths.distinct.map: path =>
         PathWithRegex(path, routePathToRegex(path))
       
       val pathsWithMatches = pathsWithRegex.map: pathWithRegex =>
@@ -46,10 +46,13 @@ class ZapCoverageService @Inject()(
       ZapCoverageResult(
         totalRoutes        = pathsWithRegex.length,
         coveredRoutes      = coveredPaths.length,
-        coveragePercentage = BigDecimal(coveredPaths.length.toDouble / pathsWithRegex.length * 100)
-                               .setScale(2, BigDecimal.RoundingMode.HALF_UP),
+        coveragePercentage = if (pathsWithRegex.nonEmpty) then
+                               BigDecimal(coveredPaths.length.toDouble / pathsWithRegex.length * 100)
+                                 .setScale(2, BigDecimal.RoundingMode.HALF_UP)
+                             else BigDecimal(0),
         matches            = coveredPaths,
-        uncoveredPaths     = uncoveredPaths
+        uncoveredPaths     = uncoveredPaths,
+        publicPrefixes     = pathsWithPrefixes.publicPrefixes
       )
 
   private def routePathToRegex(routePath: String): Regex =
@@ -61,16 +64,21 @@ class ZapCoverageService @Inject()(
 
     s"^$regexPattern(?:\\?.*)?(?:#.*)?$$".r // allow for query params and anchor tags to be picked up and matched
 
-  private def getPublicPaths(service: String, version: String)(using HeaderCarrier): Future[Seq[String]] =
+  private def getPublicPaths(service: String, version: String)(using HeaderCarrier): Future[PathsWithPublicPrefixes] =
     for
       prodRoutes     <- serviceConfigsConnector.frontendRoutes(service, Environment.Production)
       appRoutes      <- serviceConfigsConnector.appRoutes(service, version)
     yield appRoutes match
       case Some(routes) =>
-        //TODO deal with regex frontend routes
         val publicPrefixes = prodRoutes.map(_.path)
-        routes.paths.filter: path =>
-          publicPrefixes.exists(prefix => path.startsWith(prefix))
+        val filteredPaths =
+          if publicPrefixes.nonEmpty then
+            routes.paths.filter(path => publicPrefixes.exists(path.startsWith))
+          else routes.paths  // no public prefixes found for prod, assess all routes
+
+        PathsWithPublicPrefixes(filteredPaths, publicPrefixes)
+        
       case None => throw RuntimeException(s"Unable to retrieve public paths for $service v$version")
 
 case class PathWithRegex(path: String, regex: Regex)
+case class PathsWithPublicPrefixes(paths: Seq[String], publicPrefixes: Seq[String])
