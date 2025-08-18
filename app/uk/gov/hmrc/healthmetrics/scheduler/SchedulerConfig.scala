@@ -21,20 +21,23 @@ import play.api.Configuration
 import scala.concurrent.duration.FiniteDuration
 
 case class SchedulerConfig(
-  enabledKey   : String
+  label        : String
+, lockId       : String
+, enabledKey   : String
 , enabled      : Boolean
 , interval     : FiniteDuration
 , initialDelay : FiniteDuration
+, runEvery     : FiniteDuration
 )
 
 object SchedulerConfig:
-  def apply(
-    configuration: Configuration
-  , schedulerKey : String
-  ): SchedulerConfig =
+  def apply(configuration: Configuration, label: String, key: String): SchedulerConfig =
     SchedulerConfig(
-      enabledKey   = s"$schedulerKey.enabled"
-    , enabled      = configuration.get[Boolean](s"$schedulerKey.enabled")
-    , interval     = configuration.get[FiniteDuration]( s"$schedulerKey.interval")
-    , initialDelay = configuration.get[FiniteDuration](s"$schedulerKey.initialDelay")
+      label        = label
+    , lockId       = key
+    , enabledKey   = s"scheduler.$key.enabled"
+    , enabled      = configuration.get[Boolean       ](s"scheduler.$key.enabled")
+    , interval     = configuration.get[FiniteDuration](s"scheduler.$key.interval")
+    , initialDelay = configuration.get[FiniteDuration](s"scheduler.$key.initialDelay")
+    , runEvery     = configuration.get[FiniteDuration](s"scheduler.$key.runEvery")
     )

@@ -23,12 +23,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.Configuration
-import uk.gov.hmrc.healthmetrics.connector.ReleasesConnector.{Version, WhatsRunningWhere, WhatsRunningWhereVersion}
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, Environment, TeamName, ServiceName, Version}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class ReleasesConnectorSpec
@@ -41,17 +41,46 @@ class ReleasesConnectorSpec
 
   private given HeaderCarrier = HeaderCarrier()
 
-  private val servicesConfig = ServicesConfig(
+  private val servicesConfig = ServicesConfig:
     Configuration(
       "microservice.services.releases-api.port" -> wireMockPort
     , "microservice.services.releases-api.host" -> wireMockHost
     )
-  )
 
   private val connector = ReleasesConnector(httpClientV2, servicesConfig)
+  import ReleasesConnector._
 
   "ReleasesConnector.releases" should:
-    "return a sequence of whats running where with versions for a team" in:
+
+    val expectedReleases =
+      WhatsRunningWhere(
+        ServiceName("application-1")
+      , WhatsRunningWhere.Deployment(Environment.QA        , Version(major = 1, minor = 138, patch = 0, original = "1.138.0"), lastDeployed = Instant.parse("2025-05-07T13:46:42.917Z")) ::
+        WhatsRunningWhere.Deployment(Environment.Staging   , Version(major = 1, minor = 136, patch = 0, original = "1.136.0"), lastDeployed = Instant.parse("2025-04-17T14:28:46.210Z")) ::
+        WhatsRunningWhere.Deployment(Environment.Production, Version(major = 1, minor = 136, patch = 0, original = "1.136.0"), lastDeployed = Instant.parse("2025-04-28T10:02:45.739Z")) ::
+        Nil
+      ) :: WhatsRunningWhere(
+        ServiceName("application-2")
+      , WhatsRunningWhere.Deployment(Environment.QA        , Version(major = 0, minor = 43, patch = 0, original = "0.43.0"), lastDeployed = Instant.parse("2025-05-07T13:05:14.832Z")) ::
+        WhatsRunningWhere.Deployment(Environment.Staging   , Version(major = 0, minor = 43, patch = 0, original = "0.43.0"), lastDeployed = Instant.parse("2025-05-07T13:10:51.161Z")) ::
+        WhatsRunningWhere.Deployment(Environment.Production, Version(major = 0, minor = 38, patch = 0, original = "0.38.0"), lastDeployed = Instant.parse("2025-04-28T11:11:53.646Z")) ::
+        Nil
+      ) :: Nil
+
+    "return all releases" in:
+      stubFor:
+        WireMock.get(urlEqualTo("/releases-api/whats-running-where"))
+          .willReturn:
+            aResponse()
+              .withStatus(200)
+              .withBody(whatsRunningWhereJson)
+
+      connector
+        .releases()
+        .futureValue
+        .shouldBe(expectedReleases)
+
+    "return all releases for a team" in:
       stubFor:
         WireMock.get(urlEqualTo("/releases-api/whats-running-where?teamName=Team+1"))
           .willReturn:
@@ -60,26 +89,11 @@ class ReleasesConnectorSpec
               .withBody(whatsRunningWhereJson)
 
       connector
-        .releases(TeamName("Team 1"): MetricFilter)
-        .futureValue shouldBe Seq(
-          WhatsRunningWhere(
-            List(
-              WhatsRunningWhereVersion("qa"        , Version(major = 1, minor = 138, patch = 0, original = "1.138.0"))
-            , WhatsRunningWhereVersion("staging"   , Version(major = 1, minor = 136, patch = 0, original = "1.136.0"))
-            , WhatsRunningWhereVersion("production", Version(major = 1, minor = 136, patch = 0, original = "1.136.0"))
-            )
-          )
-        , WhatsRunningWhere(
-            List(
-              WhatsRunningWhereVersion("qa"        , Version(major = 0, minor = 43, patch = 0, original = "0.43.0"))
-            , WhatsRunningWhereVersion("staging"   , Version(major = 0, minor = 43, patch = 0, original = "0.43.0"))
-            , WhatsRunningWhereVersion("production", Version(major = 0, minor = 38, patch = 0, original = "0.38.0"))
-            )
-          )
-        )
+        .releases(Some(TeamName("Team 1")))
+        .futureValue
+        .shouldBe(expectedReleases)
 
-
-    "return a sequence of whats running where with versions for a digital service" in:
+    "return all releases for a digital service" in:
       stubFor:
         WireMock.get(urlEqualTo("/releases-api/whats-running-where?digitalService=Digital+Service+1"))
           .willReturn:
@@ -88,25 +102,11 @@ class ReleasesConnectorSpec
               .withBody(whatsRunningWhereJson)
 
       connector
-        .releases(DigitalService("Digital Service 1"): MetricFilter)
-        .futureValue shouldBe Seq(
-          WhatsRunningWhere(
-            List(
-              WhatsRunningWhereVersion("qa"        , Version(major = 1, minor = 138, patch = 0, original = "1.138.0"))
-            , WhatsRunningWhereVersion("staging"   , Version(major = 1, minor = 136, patch = 0, original = "1.136.0"))
-            , WhatsRunningWhereVersion("production", Version(major = 1, minor = 136, patch = 0, original = "1.136.0"))
-            )
-          )
-        , WhatsRunningWhere(
-            List(
-              WhatsRunningWhereVersion("qa"        , Version(major = 0, minor = 43, patch = 0, original = "0.43.0"))
-            , WhatsRunningWhereVersion("staging"   , Version(major = 0, minor = 43, patch = 0, original = "0.43.0"))
-            , WhatsRunningWhereVersion("production", Version(major = 0, minor = 38, patch = 0, original = "0.38.0"))
-            )
-          )
-        )
+        .releases(Some(DigitalService("Digital Service 1")))
+        .futureValue
+        .shouldBe(expectedReleases)
 
-  private lazy val whatsRunningWhereJson: String =
+  private val whatsRunningWhereJson: String =
     """[
       {
         "applicationName": "application-1",

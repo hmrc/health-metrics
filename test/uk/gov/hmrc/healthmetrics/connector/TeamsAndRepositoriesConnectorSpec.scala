@@ -23,13 +23,13 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.Configuration
-import uk.gov.hmrc.healthmetrics.connector.TeamsAndRepositoriesConnector.{BuildData, JenkinsJob, TestJobResults}
 import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, TeamName}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import java.time.Instant
 
 class TeamsAndRepositoriesConnectorSpec
   extends AnyWordSpec
@@ -49,9 +49,10 @@ class TeamsAndRepositoriesConnectorSpec
   )
 
   private val connector = TeamsAndRepositoriesConnector(httpClientV2, servicesConfig)
+  import TeamsAndRepositoriesConnector.*
 
   "TeamsAndRepositoriesConnector.allTeams" should:
-    "return all team names" in:
+    "return all teams " in:
       stubFor:
         WireMock.get(urlEqualTo("/api/v2/teams"))
           .willReturn:
@@ -85,7 +86,11 @@ class TeamsAndRepositoriesConnectorSpec
                   }
                 ]"""
 
-      connector.allTeams().futureValue shouldBe Seq(TeamName("Team 1"), TeamName("Team 2"), TeamName("Team 3"))
+      connector.allTeams().futureValue shouldBe:
+        GitHubTeam(TeamName("Team 1"), Some(Instant.parse("2025-01-14T13:45:43Z")), List("repo-1", "repo-2", "repo-3")) ::
+        GitHubTeam(TeamName("Team 2"), Some(Instant.parse("2025-06-11T08:31:48Z")), List("repo-2", "repo-3"))           ::
+        GitHubTeam(TeamName("Team 3"), Some(Instant.parse("2021-06-17T18:05:19Z")), List("repo-4"))                     ::
+        Nil
 
   "TeamsAndRepositoriesConnector.allDigitalServices" should:
     "return all digital services" in:
