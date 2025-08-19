@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.healthmetrics
+package uk.gov.hmrc.healthmetrics.scheduler
 
-import play.api.{Configuration, Environment}
-import play.api.inject.Binding
-import uk.gov.hmrc.healthmetrics.scheduler.Schedulers
+import java.time.DayOfWeek._
+import java.time.temporal.ChronoField
+import java.time.{Instant, LocalDateTime, ZoneOffset}
 
-import java.time.Clock
+object DateAndTimeOps:
 
-class Module extends play.api.inject.Module:
+  private val workingDays = List(MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY)
 
-  override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
-    Seq(
-      bind[Schedulers].toSelf.eagerly()
-    , bind[Clock].toInstance(Clock.systemDefaultZone)
-    )
+  def isInWorkingHours(instant: Instant): Boolean =
+    val localDateTime = LocalDateTime.ofInstant(instant, ZoneOffset.UTC)
+    val hour          = localDateTime.toLocalTime.get(ChronoField.HOUR_OF_DAY)
+    val dayOfWeek     = localDateTime.toLocalDate.getDayOfWeek
+    workingDays.contains(dayOfWeek) && hour >= 9 && hour <= 17

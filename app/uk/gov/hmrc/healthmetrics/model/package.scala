@@ -18,7 +18,7 @@ package uk.gov.hmrc.healthmetrics
 
 import play.api.mvc.{PathBindable, QueryStringBindable}
 import play.api.libs.functional.syntax.*
-import play.api.libs.json.{Format, Reads, __}
+import play.api.libs.json.*
 import uk.gov.hmrc.healthmetrics.util.{Binders, FromString, FromStringEnum, Parser}
 
 package object model:
@@ -31,20 +31,20 @@ package object model:
 
     given Ordering[T] =
       Ordering.by(toString(_).toLowerCase)
-    
+
     given QueryStringBindable[T] =
       Binders.queryStringBindableFromString(
         s => Some(Right(fromString(s))),
         toString
       )
-      
+
     given PathBindable[T] =
       Binders.pathBindableFromString(
         s => Right(fromString(s))
       , toString
       )
   end StringAnyValUtils
-  
+
   type MetricFilter = TeamName | DigitalService
 
   case class TeamName(asString: String) extends AnyVal
@@ -61,13 +61,22 @@ package object model:
 
   import FromStringEnum.*
 
+  case class ServiceName(asString: String) extends AnyVal
+
+  case class RepoName(asString: String) extends AnyVal
+
   given Parser[Environment] = Parser.parser(Environment.values)
 
   enum Environment(
     override val asString: String
   ) extends FromString
     derives Reads:
-    case Production extends Environment(asString = "production")
+      case Development  extends Environment("development" )
+      case Integration  extends Environment("integration" )
+      case QA           extends Environment("qa"          )
+      case Staging      extends Environment("staging"     )
+      case ExternalTest extends Environment("externaltest")
+      case Production   extends Environment("production"  )
 
   given Parser[SlugInfoFlag] = Parser.parser(SlugInfoFlag.values)
 
@@ -104,3 +113,39 @@ package object model:
     case ContainerKills   extends LogMetricId(asString = "container-kills"   )
     case NonIndexedQuery  extends LogMetricId(asString = "non-indexed-query" )
     case SlowRunningQuery extends LogMetricId(asString = "slow-running-query")
+
+  case class Version(
+    major   : Int,
+    minor   : Int,
+    patch   : Int,
+    original: String
+  ) extends Ordered[Version]:
+
+    override def compare(other: Version): Int =
+      summon[Ordering[Version]].compare(this, other)
+
+    override def toString: String =
+      original
+
+  object Version:
+    given Ordering[Version] =
+      Ordering.by: v =>
+        (v.major, v.minor, v.patch)
+
+    def apply(s: String): Version =
+      val regex3 = """(\d+)\.(\d+)\.(\d+)(.*)""".r
+      val regex2 = """(\d+)\.(\d+)(.*)""".r
+      val regex1 = """(\d+)(.*)""".r
+      s match
+        case regex3(maj, min, patch, _) => Version(Integer.parseInt(maj), Integer.parseInt(min), Integer.parseInt(patch), s)
+        case regex2(maj, min, _)        => Version(Integer.parseInt(maj), Integer.parseInt(min), 0                      , s)
+        case regex1(patch, _)           => Version(0                    , 0                    , Integer.parseInt(patch), s)
+        case _                          => Version(0                    , 0                    , 0                      , s)
+
+    val reads: Reads[Version] = Reads:
+      case JsString(s) => JsSuccess(Version(s))
+      case JsObject(m) => m.get("original") match
+                            case Some(JsString(s)) => JsSuccess(Version(s))
+                            case _                 => JsError("Expected 'original' as a string")
+      case _           => JsError("Expected a string or an object with 'original'")
+  end Version

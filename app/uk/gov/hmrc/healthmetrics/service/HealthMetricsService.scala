@@ -90,7 +90,7 @@ class HealthMetricsService @Inject()(
   , now         : LocalDate
   )(using HeaderCarrier): Future[Int] =
     serviceDependenciesConnector
-      .bobbyReports(metricFilter, flag)
+      .bobbyReports(Some(metricFilter), flag)
       .map(_.flatMap(_.violations.filter(v => !v.exempt && now.isAfter(v.from))).size)
 
   private def bobbyWarnings(
@@ -99,7 +99,7 @@ class HealthMetricsService @Inject()(
   , now         : LocalDate
   )(using HeaderCarrier): Future[Int] =
     serviceDependenciesConnector
-      .bobbyReports(metricFilter, flag)
+      .bobbyReports(Some(metricFilter), flag)
       .map(_.flatMap(_.violations.filter(v => !v.exempt && (now.isBefore(v.from) || now.isEqual(v.from)))).size)
 
   private def actionRequiredVulnerabilities(
@@ -143,12 +143,12 @@ class HealthMetricsService @Inject()(
     metricFilter: MetricFilter
   )(using HeaderCarrier): Future[Int] =
     releasesConnector
-      .releases(metricFilter)
+      .releases(Some(metricFilter))
       .map(_.map: wrw =>
-        (wrw.versions.maxBy(_.version), wrw.versions.find(_.environment == Environment.Production.asString)) match
-          case (v1, Some(v2)) if v2.version.patch > 0
-                              || v2.version.major < v1.version.major
-                              || v2.version.minor < v1.version.minor
+        (wrw.deployments.maxBy(_.version), wrw.deployments.find(_.environment == Environment.Production)) match
+          case (d1, Some(d2)) if d2.version.patch > 0
+                              || d2.version.major < d1.version.major
+                              || d2.version.minor < d1.version.minor
                               => 1
           case _              => 0
       ).map(_.sum)

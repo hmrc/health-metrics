@@ -23,8 +23,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.Configuration
-import uk.gov.hmrc.healthmetrics.connector.ServiceDependenciesConnector.{BobbyReport, Violation}
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, SlugInfoFlag, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, SlugInfoFlag, TeamName, RepoName}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -50,84 +49,46 @@ class ServiceDependenciesConnectorSpec
   )
 
   private val connector = ServiceDependenciesConnector(httpClientV2, servicesConfig)
+  import ServiceDependenciesConnector.*
 
   "ServiceDependenciesConnector.bobbyReports" should:
+
+    val expectedBobbyReports =
+      BobbyReport(
+        RepoName("repo-1")
+      , BobbyReport.Violation(from = LocalDate.parse("2024-05-31"), exempt = true ) ::
+        BobbyReport.Violation(from = LocalDate.parse("2025-05-31"), exempt = false) ::
+        Nil
+      ) :: BobbyReport(
+        RepoName("repo-2")
+      , Seq.empty[BobbyReport.Violation]
+      ) :: Nil
+
+    "return all production bobby reports" in:
+      stubFor:
+        WireMock.get(urlEqualTo("/api/bobbyReports?flag=production"))
+          .willReturn:
+            aResponse()
+              .withStatus(200)
+              .withBody(bobbyReportsJson)
+
+      connector
+        .bobbyReports(metricFilter = None, SlugInfoFlag.Production)
+        .futureValue
+        .shouldBe(expectedBobbyReports)
+
     "return the latest bobby reports for a team" in:
       stubFor:
         WireMock.get(urlEqualTo("/api/bobbyReports?team=Team+1&flag=latest"))
           .willReturn:
             aResponse()
               .withStatus(200)
-              .withBody:
-                s"""[
-                  {
-                    "repoName": "repo-1",
-                    "repoVersion": "1.18.0",
-                    "repoType": "Other",
-                    "violations": [
-                       {
-                         "depGroup": "com.typesafe.play",
-                         "depArtefact": "play",
-                         "depVersion": "2.8.8",
-                         "depScopes": [
-                           "test",
-                           "compile"
-                         ],
-                         "range": "(,2.9.0)",
-                         "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
-                         "from": "2024-05-31",
-                         "exempt": true
-                       },
-                       {
-                         "depGroup": "com.typesafe.play",
-                         "depArtefact": "play",
-                         "depVersion": "2.8.8",
-                         "depScopes": [
-                           "test",
-                           "compile"
-                         ],
-                         "range": "(,2.9.0)",
-                         "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
-                         "from": "2025-05-31",
-                         "exempt": false
-                       }
-                    ],
-                    "lastUpdated": "2025-05-12T23:49:50.885Z",
-                    "latest": true,
-                    "production": false,
-                    "qa": false,
-                    "staging": false,
-                    "development": false,
-                    "externaltest": false,
-                    "integration": false
-                  },
-                  {
-                    "repoName": "repo-2",
-                    "repoVersion": "1.177.0",
-                    "repoType": "Other",
-                    "violations": [],
-                    "lastUpdated": "2025-05-12T23:50:26.330Z",
-                    "latest": true,
-                    "production": false,
-                    "qa": false,
-                    "staging": false,
-                    "development": false,
-                    "externaltest": false,
-                    "integration": false
-                  }
-                ]"""
+              .withBody(bobbyReportsJson)
 
       connector
-        .bobbyReports(TeamName("Team 1"): MetricFilter, SlugInfoFlag.Latest)
-        .futureValue shouldBe Seq(
-          BobbyReport(
-            Seq(
-              Violation(from = LocalDate.parse("2024-05-31"), exempt = true )
-            , Violation(from = LocalDate.parse("2025-05-31"), exempt = false)
-            )
-          )
-        , BobbyReport(Seq.empty[Violation])
-        )
+        .bobbyReports(Some(TeamName("Team 1")), SlugInfoFlag.Latest)
+        .futureValue
+        .shouldBe(expectedBobbyReports)
 
     "return production bobby reports for a team" in:
       stubFor:
@@ -135,76 +96,12 @@ class ServiceDependenciesConnectorSpec
           .willReturn:
             aResponse()
               .withStatus(200)
-              .withBody:
-                s"""[
-                  {
-                    "repoName": "repo-1",
-                    "repoVersion": "1.18.0",
-                    "repoType": "Other",
-                    "violations": [
-                       {
-                         "depGroup": "com.typesafe.play",
-                         "depArtefact": "play",
-                         "depVersion": "2.8.8",
-                         "depScopes": [
-                           "test",
-                           "compile"
-                         ],
-                         "range": "(,2.9.0)",
-                         "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
-                         "from": "2024-05-31",
-                         "exempt": true
-                       },
-                       {
-                         "depGroup": "com.typesafe.play",
-                         "depArtefact": "play",
-                         "depVersion": "2.8.8",
-                         "depScopes": [
-                           "test",
-                           "compile"
-                         ],
-                         "range": "(,2.9.0)",
-                         "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
-                         "from": "2025-05-31",
-                         "exempt": false
-                       }
-                    ],
-                    "lastUpdated": "2025-05-12T23:49:50.885Z",
-                    "latest": false,
-                    "production": true,
-                    "qa": false,
-                    "staging": false,
-                    "development": false,
-                    "externaltest": false,
-                    "integration": false
-                  },
-                  {
-                    "repoName": "repo-2",
-                    "repoVersion": "1.177.0",
-                    "repoType": "Other",
-                    "violations": [],
-                    "lastUpdated": "2025-05-12T23:50:26.330Z",
-                    "latest": false,
-                    "production": true,
-                    "qa": false,
-                    "staging": false,
-                    "development": false,
-                    "externaltest": false,
-                    "integration": false
-                  }
-                ]"""
+              .withBody(bobbyReportsJson)
 
       connector
-        .bobbyReports(TeamName("Team 1"): MetricFilter, SlugInfoFlag.Production)
-        .futureValue shouldBe Seq(
-          BobbyReport(
-            Seq(
-              Violation(from = LocalDate.parse("2024-05-31"), exempt = true )
-            , Violation(from = LocalDate.parse("2025-05-31"), exempt = false)
-            )
-          )
-        , BobbyReport(Seq.empty[Violation])
-        )
+        .bobbyReports(Some(TeamName("Team 1")), SlugInfoFlag.Production)
+        .futureValue
+        .shouldBe(expectedBobbyReports)
 
     "return the latest bobby reports for a digital service" in:
       stubFor:
@@ -212,150 +109,81 @@ class ServiceDependenciesConnectorSpec
           .willReturn:
             aResponse()
               .withStatus(200)
-              .withBody:
-                s"""[
-                  {
-                    "repoName": "repo-1",
-                    "repoVersion": "1.18.0",
-                    "repoType": "Other",
-                    "violations": [
-                       {
-                         "depGroup": "com.typesafe.play",
-                         "depArtefact": "play",
-                         "depVersion": "2.8.8",
-                         "depScopes": [
-                           "test",
-                           "compile"
-                         ],
-                         "range": "(,2.9.0)",
-                         "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
-                         "from": "2024-05-31",
-                         "exempt": true
-                       },
-                       {
-                         "depGroup": "com.typesafe.play",
-                         "depArtefact": "play",
-                         "depVersion": "2.8.8",
-                         "depScopes": [
-                           "test",
-                           "compile"
-                         ],
-                         "range": "(,2.9.0)",
-                         "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
-                         "from": "2025-05-31",
-                         "exempt": false
-                       }
-                    ],
-                    "lastUpdated": "2025-05-12T23:49:50.885Z",
-                    "latest": true,
-                    "production": false,
-                    "qa": false,
-                    "staging": false,
-                    "development": false,
-                    "externaltest": false,
-                    "integration": false
-                  },
-                  {
-                    "repoName": "repo-2",
-                    "repoVersion": "1.177.0",
-                    "repoType": "Other",
-                    "violations": [],
-                    "lastUpdated": "2025-05-12T23:50:26.330Z",
-                    "latest": true,
-                    "production": false,
-                    "qa": false,
-                    "staging": false,
-                    "development": false,
-                    "externaltest": false,
-                    "integration": false
-                  }
-                ]"""
+              .withBody(bobbyReportsJson)
 
       connector
-        .bobbyReports(DigitalService("Digital Service 1"): MetricFilter, SlugInfoFlag.Latest)
-        .futureValue shouldBe Seq(
-          BobbyReport(
-            Seq(
-              Violation(from = LocalDate.parse("2024-05-31"), exempt = true )
-            , Violation(from = LocalDate.parse("2025-05-31"), exempt = false)
-            )
-          )
-        , BobbyReport(Seq.empty[Violation])
-        )
-      
+        .bobbyReports(Some(DigitalService("Digital Service 1")), SlugInfoFlag.Latest)
+        .futureValue
+        .shouldBe(expectedBobbyReports)
+
     "return production bobby reports for a digital service" in:
       stubFor:
         WireMock.get(urlEqualTo("/api/bobbyReports?digitalService=Digital+Service+1&flag=production"))
           .willReturn:
             aResponse()
               .withStatus(200)
-              .withBody:
-                s"""[
-                  {
-                    "repoName": "repo-1",
-                    "repoVersion": "1.18.0",
-                    "repoType": "Other",
-                    "violations": [
-                       {
-                         "depGroup": "com.typesafe.play",
-                         "depArtefact": "play",
-                         "depVersion": "2.8.8",
-                         "depScopes": [
-                           "test",
-                           "compile"
-                         ],
-                         "range": "(,2.9.0)",
-                         "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
-                         "from": "2024-05-31",
-                         "exempt": true
-                       },
-                       {
-                         "depGroup": "com.typesafe.play",
-                         "depArtefact": "play",
-                         "depVersion": "2.8.8",
-                         "depScopes": [
-                           "test",
-                           "compile"
-                         ],
-                         "range": "(,2.9.0)",
-                         "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
-                         "from": "2025-05-31",
-                         "exempt": false
-                       }
-                    ],
-                    "lastUpdated": "2025-05-12T23:49:50.885Z",
-                    "latest": false,
-                    "production": true,
-                    "qa": false,
-                    "staging": false,
-                    "development": false,
-                    "externaltest": false,
-                    "integration": false
-                  },
-                  {
-                    "repoName": "repo-2",
-                    "repoVersion": "1.177.0",
-                    "repoType": "Other",
-                    "violations": [],
-                    "lastUpdated": "2025-05-12T23:50:26.330Z",
-                    "latest": false,
-                    "production": true,
-                    "qa": false,
-                    "staging": false,
-                    "development": false,
-                    "externaltest": false,
-                    "integration": false
-                  }
-                ]"""
+              .withBody(bobbyReportsJson)
 
       connector
-        .bobbyReports(DigitalService("Digital Service 1"): MetricFilter, SlugInfoFlag.Production)
-        .futureValue shouldBe Seq(
-          BobbyReport(
-            Seq(
-              Violation(from = LocalDate.parse("2024-05-31"), exempt = true )
-            , Violation(from = LocalDate.parse("2025-05-31"), exempt = false)
-            )
-          )
-        , BobbyReport(Seq.empty[Violation])
-        )
+        .bobbyReports(Some(DigitalService("Digital Service 1")), SlugInfoFlag.Production)
+        .futureValue
+        .shouldBe(expectedBobbyReports)
+
+  private val bobbyReportsJson =
+    s"""[
+      {
+        "repoName": "repo-1",
+        "repoVersion": "1.18.0",
+        "repoType": "Other",
+        "violations": [
+            {
+              "depGroup": "com.typesafe.play",
+              "depArtefact": "play",
+              "depVersion": "2.8.8",
+              "depScopes": [
+                "test",
+                "compile"
+              ],
+              "range": "(,2.9.0)",
+              "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
+              "from": "2024-05-31",
+              "exempt": true
+            },
+            {
+              "depGroup": "com.typesafe.play",
+              "depArtefact": "play",
+              "depVersion": "2.8.8",
+              "depScopes": [
+                "test",
+                "compile"
+              ],
+              "range": "(,2.9.0)",
+              "reason": "Play 3.0 upgrade - Deprecate [Play 2.8 and below]...",
+              "from": "2025-05-31",
+              "exempt": false
+            }
+        ],
+        "lastUpdated": "2025-05-12T23:49:50.885Z",
+        "latest": true,
+        "production": false,
+        "qa": false,
+        "staging": false,
+        "development": false,
+        "externaltest": false,
+        "integration": false
+      },
+      {
+        "repoName": "repo-2",
+        "repoVersion": "1.177.0",
+        "repoType": "Other",
+        "violations": [],
+        "lastUpdated": "2025-05-12T23:50:26.330Z",
+        "latest": true,
+        "production": false,
+        "qa": false,
+        "staging": false,
+        "development": false,
+        "externaltest": false,
+        "integration": false
+      }
+    ]"""

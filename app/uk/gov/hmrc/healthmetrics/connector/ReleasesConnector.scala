@@ -17,13 +17,14 @@
 package uk.gov.hmrc.healthmetrics.connector
 
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
-import play.api.libs.json.{JsError, JsObject, JsResult, JsString, JsSuccess, JsValue, Reads, __}
-import uk.gov.hmrc.healthmetrics.connector.ReleasesConnector.WhatsRunningWhere
-import uk.gov.hmrc.healthmetrics.model.{MetricFilter, TeamName, DigitalService}
+import play.api.libs.json.{JsResult, Reads, __}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpReads, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
+import uk.gov.hmrc.healthmetrics.connector.ReleasesConnector.WhatsRunningWhere
+import uk.gov.hmrc.healthmetrics.model.{Environment, MetricFilter, TeamName, DigitalService, ServiceName, Version}
 
+import java.time.Instant
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -39,67 +40,38 @@ class ReleasesConnector @Inject() (
 
   private given Reads[WhatsRunningWhere] = WhatsRunningWhere.reads
 
-  def releases(metricFilter: MetricFilter)(using HeaderCarrier): Future[Seq[WhatsRunningWhere]] =
-    val params: MetricFilter => Map[String, String] =
-      case TeamName(name)       => Map("teamName"       -> name)
-      case DigitalService(name) => Map("digitalService" -> name)
+  def releases(
+    metricFilter: Option[MetricFilter] = None
+  )(using HeaderCarrier): Future[Seq[WhatsRunningWhere]] =
+    val params: Option[MetricFilter] => Map[String, String] =
+      case Some(TeamName(name)      ) => Map("teamName"       -> name)
+      case Some(DigitalService(name)) => Map("digitalService" -> name)
+      case None                       => Map.empty
 
     httpClientV2
       .get(url"$url/releases-api/whats-running-where?${params(metricFilter)}")
       .execute[Seq[WhatsRunningWhere]]
 
 object ReleasesConnector:
-  case class Version(
-    major   : Int,
-    minor   : Int,
-    patch   : Int,
-    original: String
-  ) extends Ordered[Version]:
-
-    override def compare(other: Version): Int =
-      summon[Ordering[Version]].compare(this, other)
-
-    override def toString: String =
-      original
-
-  object Version:
-    given Ordering[Version] =
-      Ordering.by: v =>
-        (v.major, v.minor, v.patch)
-        
-    def apply(s: String): Version =
-      val regex3 = """(\d+)\.(\d+)\.(\d+)(.*)""".r
-      val regex2 = """(\d+)\.(\d+)(.*)""".r
-      val regex1 = """(\d+)(.*)""".r
-      s match
-        case regex3(maj, min, patch, _) => Version(Integer.parseInt(maj), Integer.parseInt(min), Integer.parseInt(patch), s)
-        case regex2(maj, min, _)        => Version(Integer.parseInt(maj), Integer.parseInt(min), 0                      , s)
-        case regex1(patch, _)           => Version(0                    , 0                    , Integer.parseInt(patch), s)
-        case _                          => Version(0                    , 0                    , 0                      , s)
-    
-    val reads: Reads[Version] = Reads:
-      case JsString(s) => JsSuccess(Version(s))
-      case JsObject(m) => m.get("original") match
-                            case Some(JsString(s)) => JsSuccess(Version(s))
-                            case _                 => JsError("Expected 'original' as a string")
-      case _           => JsError("Expected a string or an object with 'original'")
-  end Version
-  
-  case class WhatsRunningWhereVersion(
-    environment: String
-  , version    : Version
+  case class WhatsRunningWhere(
+    serviceName: ServiceName
+  , deployments: List[WhatsRunningWhere.Deployment]
   )
-  
-  object WhatsRunningWhereVersion:
-    val reads: Reads[WhatsRunningWhereVersion] =
-      ( (__ \ "environment"  ).read[String]
-      ~ (__ \ "versionNumber").read[Version](Version.reads)
-      )(WhatsRunningWhereVersion.apply)
-  
-  
-  case class WhatsRunningWhere(versions: List[WhatsRunningWhereVersion])
-  
+
   object WhatsRunningWhere:
-    val reads: Reads[WhatsRunningWhere] = 
-      given Reads[WhatsRunningWhereVersion] = WhatsRunningWhereVersion.reads
-      (__ \ "versions").read[List[WhatsRunningWhereVersion]].map(WhatsRunningWhere.apply)
+    case class Deployment(
+      environment : Environment
+    , version     : Version
+    , lastDeployed: Instant,
+    )
+
+    val reads: Reads[WhatsRunningWhere] =
+      given Reads[Deployment] =
+        ( (__ \ "environment"  ).read[Environment]
+        ~ (__ \ "versionNumber").read[Version](Version.reads)
+        ~ (__ \ "lastDeployed" ).read[Instant]
+        )(Deployment.apply)
+
+      ( (__ \ "applicationName").read[String].map(ServiceName.apply)
+      ~ (__ \ "versions"       ).read[List[Deployment]]
+      )(WhatsRunningWhere.apply)

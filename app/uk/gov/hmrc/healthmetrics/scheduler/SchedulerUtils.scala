@@ -17,14 +17,13 @@
 package uk.gov.hmrc.healthmetrics.scheduler
 
 import org.apache.pekko.actor.ActorSystem
-import play.api.Logger
+import play.api.Logging
 import play.api.inject.ApplicationLifecycle
 import uk.gov.hmrc.mongo.lock.ScheduledLockService
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait SchedulerUtils:
-  val logger: Logger
+trait SchedulerUtils extends Logging:
 
   def schedule(
     label          : String
@@ -72,3 +71,5 @@ trait SchedulerUtils:
         .map:
           case Some(_) => logger.debug(s"Scheduler $label finished - releasing lock")
           case None    => logger.debug(s"Scheduler $label cannot run - lock ${lock.lockId} is taken... skipping update")
+
+object SchedulerUtils extends SchedulerUtils
