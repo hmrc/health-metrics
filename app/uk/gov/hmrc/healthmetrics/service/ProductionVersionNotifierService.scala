@@ -40,8 +40,8 @@ class ProductionVersionNotifierService @Inject()(
 
   given HeaderCarrier = HeaderCarrier()
 
-  private val minimumDeploymentAge = configuration.get[Duration]("production-version-slack-notifier.minimumDeploymentAge")
-  private val channelOverride      = configuration.getOptional[String]("microservice.services.slack-notifications.channelOverride")
+  private val minimumDeploymentAge =
+    configuration.get[Duration]("production-version-slack-notifier.minimumDeploymentAge")
 
   def notify(runTime: Instant): Future[Unit] =
       for
@@ -64,7 +64,7 @@ class ProductionVersionNotifierService @Inject()(
                              .filter:
                                case (_, deployments) => deployments.nonEmpty
         _               =  logger.info(s"There are ${notifyTeams.size} teams with a total of ${notifyTeams.flatMap(_._2.map(_.serviceName)).distinct.size} services with a lower production version than in other environments to send slack notifications for.")
-        slackResponses  <- (if channelOverride.isDefined then notifyTeams.take(5) else notifyTeams)
+        slackResponses  <- notifyTeams
                              .foldLeftM(List.empty[(TeamName, Seq[ReleasesConnector.WhatsRunningWhere], SlackNotificationsConnector.Response)]):
                                case (acc, (teamName, wrw)) =>
                                  slackNotificationsConnector
@@ -85,7 +85,7 @@ class ProductionVersionNotifierService @Inject()(
     , text            = s"${teamName.asString} has repositories with Production versions that are lower than other environments."
     , blocks          = Seq:
                           SlackNotificationsConnector.mrkdwnBlock:
-                            val url = url"https://catalogue.tax.service.gov.uk/whats-running-where?profile_type=team&application_name=&profile_name=${teamName.asString}&view_mode=versions"
+                            val url = url"https://catalogue.tax.service.gov.uk/whats-running-where?teamName=${teamName.asString}"
                             s"${teamName.asString}, please check <$url|What's Running Where>." +
                               s"\\n\\nThe following services belonging to your team have had a lower version in Production than in some other environments for at least $minimumDeploymentAge." +
                               s"\\n\\n${serviceNames.map(r => s"`${r.asString}`").mkString("\\n\\n")}"

@@ -40,7 +40,8 @@ class UpcomingBobbyNotifierService @Inject()(
 
   private given HeaderCarrier = HeaderCarrier()
 
-  private val futureDatedRuleWindow = configuration.get[Duration]("upcoming-bobby-notifier.ruleNotificationWindow")
+  private val futureDatedRuleWindow =
+    configuration.get[Duration]("upcoming-bobby-notifier.ruleNotificationWindow")
 
   extension (localDate: LocalDate)
     def toInstant: Instant = localDate.atStartOfDay().toInstant(ZoneOffset.UTC)
@@ -90,8 +91,8 @@ class UpcomingBobbyNotifierService @Inject()(
 
       SlackNotificationsConnector.Request(
         channelLookup   = channelLookup,
-        displayName     = "BobbyWarnings",
-        emoji           = ":platops-bobby:",
+        displayName     = "MDTP Catalogue",
+        emoji           = ":tudor-crown:",
         text            = "There are upcoming Bobby Rules affecting your service(s)",
         blocks          = msg :: ruleBlocks,
         callbackChannel = Some("team-platops-alerts")
