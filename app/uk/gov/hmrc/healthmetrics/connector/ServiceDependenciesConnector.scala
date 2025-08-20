@@ -18,11 +18,11 @@ package uk.gov.hmrc.healthmetrics.connector
 
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.{Reads, __}
-import uk.gov.hmrc.healthmetrics.connector.ServiceDependenciesConnector.BobbyReport
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, SlugInfoFlag, TeamName}
 import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
+import uk.gov.hmrc.healthmetrics.connector.ServiceDependenciesConnector.BobbyReport
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, SlugInfoFlag, TeamName, ServiceName, RepoName}
 
 import java.time.LocalDate
 import javax.inject.{Inject, Singleton}
@@ -38,38 +38,56 @@ class ServiceDependenciesConnector @Inject() (
 
   import uk.gov.hmrc.http.HttpReads.Implicits._
 
-  private val url: String = 
+  private val url: String =
     servicesConfig.baseUrl("service-dependencies")
 
   def bobbyReports(
-    metricFilter: MetricFilter
+    metricFilter: Option[MetricFilter] = None
   , flag        : SlugInfoFlag
   )(using HeaderCarrier): Future[Seq[BobbyReport]] =
 
-    val params: MetricFilter => Map[String, String] =
-      case TeamName(name)       => Map("team"           -> name)
-      case DigitalService(name) => Map("digitalService" -> name)
+    val params: Option[MetricFilter] => Map[String, String] =
+      case Some(TeamName(name)      ) => Map("team"           -> name)
+      case Some(DigitalService(name)) => Map("digitalService" -> name)
+      case None                       => Map.empty
 
     given Reads[BobbyReport] = BobbyReport.reads
     httpClientV2
       .get(url"$url/api/bobbyReports?${params(metricFilter)}&flag=${flag.asString}")
       .execute[Seq[BobbyReport]]
 
-object ServiceDependenciesConnector:
-  case class Violation(
-    from  : LocalDate
-  , exempt: Boolean
-  )
-  
-  object Violation:
-    val reads: Reads[Violation] =
-      ( (__ \ "from"  ).read[LocalDate]
-      ~ (__ \ "exempt").read[Boolean]
-      )(Violation.apply _)
+  def getAffectedServices(
+    group: String
+  , artefact: String
+  , versionRange: String
+  )(using HeaderCarrier): Future[Seq[ServiceDependenciesConnector.AffectedService]] =
+    given Reads[ServiceDependenciesConnector.AffectedService] = ServiceDependenciesConnector.AffectedService.reads
+    httpClientV2
+      .get(url"$url/api/repoDependencies?group=$group&artefact=$artefact&versionRange=$versionRange&repoType=Service")
+      .execute[Seq[ServiceDependenciesConnector.AffectedService]]
 
-  case class BobbyReport(violations: Seq[Violation])
-  
+object ServiceDependenciesConnector:
+  case class BobbyReport(repoName: RepoName, violations: Seq[BobbyReport.Violation])
   object BobbyReport:
+    case class Violation(
+      from  : LocalDate
+    , exempt: Boolean
+    )
+
     val reads: Reads[BobbyReport] =
-      given Reads[Violation] = Violation.reads
-      (__ \ "violations").read[Seq[Violation]].map(BobbyReport.apply)
+      given Reads[Violation] =
+        ( (__ \ "from"  ).read[LocalDate]
+        ~ (__ \ "exempt").read[Boolean]
+        )(Violation.apply _)
+
+      ( (__ \ "repoName"  ).read[String].map(RepoName.apply _)
+      ~ (__ \ "violations").read[Seq[Violation]]
+      )(BobbyReport.apply)
+
+  case class AffectedService(serviceName: ServiceName, teamNames: List[TeamName])
+
+  object AffectedService:
+    val reads: Reads[AffectedService] =
+      ( (__ \ "repoName").read[String      ].map(ServiceName.apply)
+      ~ (__ \ "teams"   ).read[List[String]].map(_.map(TeamName.apply))
+      )(AffectedService.apply _)

@@ -16,8 +16,6 @@
 
 package uk.gov.hmrc.healthmetrics.persistence
 
-import org.mongodb.scala.ObservableFuture
-import org.mongodb.scala.SingleObservableFuture
 import org.mongodb.scala.bson.BsonDocument
 import org.mongodb.scala.model.Indexes.descending
 import org.mongodb.scala.model.{Filters, IndexModel, Indexes, Sorts}

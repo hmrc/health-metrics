@@ -18,14 +18,15 @@ package uk.gov.hmrc.healthmetrics.connector
 
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.json.{JsValue, Reads, __}
-import uk.gov.hmrc.healthmetrics.connector.TeamsAndRepositoriesConnector.JenkinsJob
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, TeamName}
 import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
+import uk.gov.hmrc.healthmetrics.connector.TeamsAndRepositoriesConnector.JenkinsJob
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, TeamName, RepoName}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
+import java.time.Instant
 
 @Singleton
 class TeamsAndRepositoriesConnector @Inject()(
@@ -34,24 +35,29 @@ class TeamsAndRepositoriesConnector @Inject()(
 )(using
   ExecutionContext
 ):
-  
+
   import uk.gov.hmrc.http.HttpReads.Implicits._
 
-  private val url: String = 
+  private val url: String =
     servicesConfig.baseUrl("teams-and-repositories")
-  
-  def allTeams()(using HeaderCarrier): Future[Seq[TeamName]] =
-    given Reads[TeamName] = TeamName.nameReads
+
+  def allRepos()(using HeaderCarrier): Future[Seq[TeamsAndRepositoriesConnector.Repo]] =
+    given Reads[TeamsAndRepositoriesConnector.Repo] = TeamsAndRepositoriesConnector.Repo.reads
+    httpClientV2
+      .get(url"$url/api/v2/repositories?organisation=mdtp&archived=false")
+      .execute[Seq[TeamsAndRepositoriesConnector.Repo]]
+
+  def allTeams()(using HeaderCarrier): Future[Seq[TeamsAndRepositoriesConnector.GitHubTeam]] =
+    given Reads[TeamsAndRepositoriesConnector.GitHubTeam] = TeamsAndRepositoriesConnector.GitHubTeam.reads
     httpClientV2
      .get(url"$url/api/v2/teams")
-     .execute[Seq[TeamName]]
+     .execute[Seq[TeamsAndRepositoriesConnector.GitHubTeam]]
 
   def allDigitalServices()(using HeaderCarrier): Future[Seq[DigitalService]] =
     given Reads[DigitalService] = DigitalService.reads
     httpClientV2
       .get(url"$url/api/v2/digital-services")
       .execute[Seq[DigitalService]]
-
 
   def openPullRequestsForReposOwnedByTeam(team: TeamName)(using HeaderCarrier): Future[Int] =
     httpClientV2
@@ -82,7 +88,31 @@ class TeamsAndRepositoriesConnector @Inject()(
       .get(url"$url/api/test-jobs?${params(metricFilter)}")
       .execute[Seq[JenkinsJob]]
 
+
 object TeamsAndRepositoriesConnector:
+
+  case class Repo(repoName: RepoName, teamNames: Seq[TeamName],  endOfLifeDate: Option[Instant], isDeprecated: Boolean = false)
+  object Repo:
+    val reads: Reads[Repo] =
+      ( (__ \ "name"         ).read[String].map(RepoName.apply)
+      ~ (__ \ "teamNames"    ).read[Seq[TeamName]]
+      ~ (__ \ "endOfLifeDate").readNullable[Instant]
+      ~ (__ \ "isDeprecated" ).readWithDefault[Boolean](false)
+      )(Repo.apply _)
+
+  case class GitHubTeam(
+    name           : TeamName,
+    lastActiveDate : Option[Instant],
+    repos          : Seq[String]
+  )
+
+  object GitHubTeam:
+    val reads: Reads[GitHubTeam] =
+      ( (__ \ "name"          ).read[TeamName]
+      ~ (__ \ "lastActiveDate").readNullable[Instant]
+      ~ (__ \ "repos"         ).read[Seq[String]]
+      )(GitHubTeam.apply)
+
   case class TestJobResults(
     numAccessibilityViolations : Option[Int]
   , numSecurityAlerts          : Option[Int]
