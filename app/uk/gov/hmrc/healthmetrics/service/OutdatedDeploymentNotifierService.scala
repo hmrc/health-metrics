@@ -85,20 +85,22 @@ class OutdatedDeploymentNotifierService @Inject()(
         s"Hello ${teamName.asString}, \\nSome of your services are running outdated versions in lower environments. \\n\\nPlease undeploy them in the environment if that environment is not being used, or deploy the latest version to that environment."
       )
 
-    val bulletLines: String =
+    val bulletLines: Seq[String] =
       outdated.map:
         case (service, env, deployed, latest) =>
           s"• <https://catalogue.tax.service.gov.uk/repositories/${service.asString}|${service.asString}> is running $deployed in ${env.asString} (latest: $latest)."
-      .mkString("\\n")
 
-    val block2: JsValue =
-      SlackNotificationsConnector.mrkdwnBlock(bulletLines)
+    // Break into chunks of max 10 lines each to stay under Slack's 3000 char per block limit
+    val bulletBlocks: Seq[JsValue] =
+      bulletLines.grouped(10).map: group =>
+        SlackNotificationsConnector.mrkdwnBlock(group.mkString("\\n"))
+      .toSeq
 
     SlackNotificationsConnector.Request(
       channelLookup   = channelLookup,
       displayName     = "MDTP Catalogue",
       emoji           = ":tudor-crown:",
       text            = "Some services have outdated versions deployed in lower environments",
-      blocks          = Seq(block1, block2),
+      blocks          = block1 +: bulletBlocks,
       callbackChannel = Some("team-platops-alerts")
     )
