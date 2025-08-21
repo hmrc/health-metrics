@@ -116,7 +116,7 @@ class Schedulers @Inject()(
 
   scheduleWithLock("Outdated Deployment Notifier", "outdated-deployment-notifier"): schedulerConfig =>
     run(schedulerConfig):
-      outdatedDeploymentNotifierService.notify()
+      outdatedDeploymentNotifierService.notify(Instant.now())
 
   private def run(schedulerConfig: SchedulerConfig)(f: => Future[Unit]): Future[Unit] =
     val now   = Instant.now()

@@ -17,17 +17,20 @@
 package uk.gov.hmrc.healthmetrics.service
 
 import cats.implicits.*
-import play.api.Logging
+import play.api.{Configuration, Logging}
 import play.api.libs.json.JsValue
 import uk.gov.hmrc.healthmetrics.connector.{ReleasesConnector, SlackNotificationsConnector, TeamsAndRepositoriesConnector}
 import uk.gov.hmrc.healthmetrics.model.*
 import uk.gov.hmrc.http.HeaderCarrier
 
+import java.time.{Duration, Instant}
+import java.time.temporal.ChronoUnit
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class OutdatedDeploymentNotifierService @Inject()(
+  configuration                : Configuration,
   releasesConnector            : ReleasesConnector,
   slackNotificationsConnector  : SlackNotificationsConnector,
   teamsAndRepositoriesConnector: TeamsAndRepositoriesConnector
@@ -35,14 +38,20 @@ class OutdatedDeploymentNotifierService @Inject()(
   ec: ExecutionContext
 ) extends Logging:
 
-  def notify()(using hc: HeaderCarrier): Future[Unit] =
+  private val minimumDeploymentAge =
+    configuration.get[Duration]("outdated-deployment-notifier.minimumDeploymentAge")
+
+  def notify(runTime: Instant)(using hc: HeaderCarrier): Future[Unit] =
     for
       teams        <- teamsAndRepositoriesConnector.allTeams()
       releases     <- releasesConnector.releases()
+      timeLimit     = runTime
+                        .truncatedTo(ChronoUnit.DAYS)
+                        .minus(minimumDeploymentAge.toDays, ChronoUnit.DAYS)
       outdated      = releases.flatMap: wrw =>
                         val latest = wrw.deployments.maxBy(_.version).version
                         wrw.deployments.collect:
-                          case d if d.environment != Environment.Production && d.version < latest =>
+                          case d if d.environment != Environment.Production && d.version < latest && d.lastDeployed.isBefore(timeLimit) =>
                             (wrw.serviceName, d.environment, d.version, latest)
       byTeam        = teams
                         .map( team => (
@@ -50,6 +59,7 @@ class OutdatedDeploymentNotifierService @Inject()(
                           outdated
                             .filter((serviceName, _, _, _) => team.repos.contains(serviceName.asString))
                         ))
+                        .filterNot(_._2 == Nil)
       responses    <- byTeam.toList.foldLeftM(Seq.empty[SlackNotificationsConnector.Response]):
                         case (acc, (teamName, outdatedServices)) =>
                           slackNotificationsConnector
@@ -72,7 +82,7 @@ class OutdatedDeploymentNotifierService @Inject()(
 
     val block1: JsValue =
       SlackNotificationsConnector.mrkdwnBlock(
-        s"Hello ${teamName.asString}, \\nSome of your services are running outdated versions in some environments. \\n\\nPlease undeploy them in the environment if that environment is not being used, or deploy the latest version to that environment."
+        s"Hello ${teamName.asString}, \\nSome of your services are running outdated versions in lower environments. \\n\\nPlease undeploy them in the environment if that environment is not being used, or deploy the latest version to that environment."
       )
 
     val bulletLines: String =
