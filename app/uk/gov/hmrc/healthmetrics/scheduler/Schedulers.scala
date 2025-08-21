@@ -41,6 +41,7 @@ class Schedulers @Inject()(
 , callingDeprecatedServiceNotifierService : CallingDeprecatedServiceNotifierService
 , productionBobbyNotifierService          : ProductionBobbyNotifierService
 , productionVersionNotifierService        : ProductionVersionNotifierService
+, outdatedDeploymentNotifierService       : OutdatedDeploymentNotifierService
 , productionVulnerabilitiesNotifierService: ProductionVulnerabilitiesNotifierService
 , upcomingBobbyNotifierService            : UpcomingBobbyNotifierService
 , mongoLockRepository                     : MongoLockRepository
@@ -112,6 +113,10 @@ class Schedulers @Inject()(
   scheduleWithLock("Production Vulnerabilities Notifier", "upcoming-bobby-notifier"): schedulerConfig =>
     run(schedulerConfig):
       upcomingBobbyNotifierService.notify(Instant.now())
+
+  scheduleWithLock("Outdated Deployment Notifier", "outdated-deployment-notifier"): schedulerConfig =>
+    run(schedulerConfig):
+      outdatedDeploymentNotifierService.notify(Instant.now())
 
   private def run(schedulerConfig: SchedulerConfig)(f: => Future[Unit]): Future[Unit] =
     val now   = Instant.now()

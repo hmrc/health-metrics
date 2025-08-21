@@ -18,12 +18,12 @@ package uk.gov.hmrc.healthmetrics.connector
 
 import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, stubFor, urlEqualTo}
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.Configuration
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, Environment, TeamName, ServiceName, Version}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, Environment, ServiceName, TeamName, Version}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -37,6 +37,7 @@ class ReleasesConnectorSpec
      with ScalaFutures
      with HttpClientV2Support
      with MockitoSugar
+     with IntegrationPatience
      with WireMockSupport:
 
   private given HeaderCarrier = HeaderCarrier()
