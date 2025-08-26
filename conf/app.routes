@@ -5,3 +5,5 @@ GET        /teams/:team/health-metrics/latest                       uk.gov.hmrc.
 GET        /digital-services/:digitalService/health-metrics/latest  uk.gov.hmrc.healthmetrics.controllers.HealthMetricsController.latestDigitalServiceHealthMetrics(digitalService: DigitalService)
 
 GET        /timeline                                                uk.gov.hmrc.healthmetrics.controllers.HealthMetricsController.healthMetricsTimelineCounts(team: TeamName, healthMetric: HealthMetric, from: java.time.LocalDate, to: java.time.LocalDate)
+
+POST       /calculate-zap-coverage                                  uk.gov.hmrc.healthmetrics.controllers.ZapCoverageController.calculateZapCoverage

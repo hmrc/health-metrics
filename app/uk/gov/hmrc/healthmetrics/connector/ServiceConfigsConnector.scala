@@ -21,7 +21,7 @@ import play.api.libs.json.{Reads, __}
 import uk.gov.hmrc.http.{HeaderCarrier, HttpReads, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
-import uk.gov.hmrc.healthmetrics.model.ServiceName
+import uk.gov.hmrc.healthmetrics.model.{Environment, ServiceName, Version}
 
 import java.time.LocalDate
 import javax.inject.Inject
@@ -51,6 +51,24 @@ class ServiceConfigsConnector @Inject()(
     httpClientV2
       .get(url"$serviceUrl/service-configs/service-relationships/${serviceName.asString}")
       .execute[Option[ServiceConfigsConnector.ServiceRelationships]]
+
+  def appRoutes(
+    serviceName: ServiceName
+  , version    : Version
+  )(using HeaderCarrier): Future[Option[ServiceConfigsConnector.AppRoutes]] =
+    given Reads[ServiceConfigsConnector.AppRoutes] = ServiceConfigsConnector.AppRoutes.reads
+    httpClientV2
+      .get(url"$serviceUrl/service-configs/app-routes/${serviceName.asString}/$version")
+      .execute[Option[ServiceConfigsConnector.AppRoutes]]
+
+  def frontendRoutes(
+    serviceName: ServiceName
+  , environment: Environment
+  )(using HeaderCarrier): Future[Seq[ServiceConfigsConnector.FrontendRoute]] =
+    given Reads[ServiceConfigsConnector.FrontendRoute] = ServiceConfigsConnector.FrontendRoute.reads
+    httpClientV2
+      .get(url"$serviceUrl/service-configs/routes?serviceName=${serviceName.asString}&environment=${environment.asString}")
+      .execute[Seq[ServiceConfigsConnector.FrontendRoute]]
 
 object ServiceConfigsConnector:
   import play.api.libs.functional.syntax.*
@@ -94,3 +112,28 @@ object ServiceConfigsConnector:
       ( (__ \ "inboundServices" ).read[Set[String]].map(_.map(ServiceName.apply _))
       ~ (__ \ "outboundServices").read[Set[String]].map(_.map(ServiceName.apply _))
       )(ServiceRelationships.apply _)
+
+  case class AppRoutes(
+    service: ServiceName
+  , version: Version
+  , paths  : Seq[String]
+  )
+
+  object AppRoutes:
+    given Reads[Version] = Version.reads
+    val reads: Reads[AppRoutes] =
+      ( (__ \ "service").read[String].map(ServiceName.apply _)
+      ~ (__ \ "version").read[Version]
+      ~ (__ \ "routes" ).read[Seq[String]](Reads.seq((__ \ "path").read[String]))
+      )(AppRoutes.apply _)
+
+  case class FrontendRoute(
+    path   : String
+  , isRegex: Boolean
+  )
+
+  object FrontendRoute:
+    val reads: Reads[FrontendRoute] =
+      ( (__ \ "path"   ).read[String]
+      ~ (__ \ "isRegex").read[Boolean]
+      )(FrontendRoute.apply _)
