@@ -132,7 +132,7 @@ class ServiceConfigsConnectorSpec
   "ServiceConfigsConnector.frontendRoutes" should:
     "return routes for service" in:
       stubFor:
-        get(urlEqualTo("/service-configs/routes?serviceName=test-service&environment=production"))
+        get(urlEqualTo("/service-configs/routes?serviceName=test-service&environment=production&routeType=frontend"))
           .willReturn:
             aResponse()
               .withStatus(200)
@@ -148,7 +148,7 @@ class ServiceConfigsConnectorSpec
                     ]"""
 
       connector
-        .frontendRoutes(ServiceName("test-service"), Environment.Production)
+        .frontendRoutes(ServiceName("test-service"), Environment.Production, routeType = "frontend")
         .futureValue shouldBe Seq(
           FrontendRoute(
             path    = "/test-service",

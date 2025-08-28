@@ -40,8 +40,11 @@ class ZapCoverageServiceSpec
 
   "ZapCoverageService.calculateZapCoverage" should:
     "evaluate coverage for all public routes" in new Setup:
-      when(serviceConfigsConnector.frontendRoutes(any[ServiceName], eqTo(Environment.Production))(using any[HeaderCarrier]))
+      when(serviceConfigsConnector.frontendRoutes(any[ServiceName], eqTo(Environment.Production), eqTo("frontend"))(using any[HeaderCarrier]))
         .thenReturn(Future.successful(Seq(FrontendRoute("/test-service", isRegex = false))))
+
+      when(serviceConfigsConnector.frontendRoutes(any[ServiceName], eqTo(Environment.Production), eqTo("adminfrontend"))(using any[HeaderCarrier]))
+        .thenReturn(Future.successful(Seq.empty[FrontendRoute]))
 
       when(serviceConfigsConnector.appRoutes(any[ServiceName], any[Version])(using any[HeaderCarrier]))
         .thenReturn(Future.successful(

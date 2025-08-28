@@ -64,10 +64,11 @@ class ServiceConfigsConnector @Inject()(
   def frontendRoutes(
     serviceName: ServiceName
   , environment: Environment
+  , routeType  : String
   )(using HeaderCarrier): Future[Seq[ServiceConfigsConnector.FrontendRoute]] =
     given Reads[ServiceConfigsConnector.FrontendRoute] = ServiceConfigsConnector.FrontendRoute.reads
     httpClientV2
-      .get(url"$serviceUrl/service-configs/routes?serviceName=${serviceName.asString}&environment=${environment.asString}")
+      .get(url"$serviceUrl/service-configs/routes?serviceName=${serviceName.asString}&environment=${environment.asString}&routeType=$routeType")
       .execute[Seq[ServiceConfigsConnector.FrontendRoute]]
 
 object ServiceConfigsConnector:
