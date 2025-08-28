@@ -72,8 +72,8 @@ class ZapCoverageService @Inject()(
 
   private def getPublicPaths(service: ServiceName, version: Version)(using HeaderCarrier): Future[PathsWithPublicPrefixes] =
     for
-      frontendRoutes <- serviceConfigsConnector.frontendRoutes(service, Environment.Production, routeType = "frontend")
-      adminRoutes    <- serviceConfigsConnector.frontendRoutes(service, Environment.Production, routeType = "adminfrontend")
+      frontendRoutes <- serviceConfigsConnector.frontendRoutes(service, Environment.QA, routeType = "frontend")
+      adminRoutes    <- serviceConfigsConnector.frontendRoutes(service, Environment.QA, routeType = "adminfrontend")
       prodRoutes     =  frontendRoutes ++ adminRoutes
       appRoutes      <- serviceConfigsConnector.appRoutes(service, version)
     yield appRoutes match
