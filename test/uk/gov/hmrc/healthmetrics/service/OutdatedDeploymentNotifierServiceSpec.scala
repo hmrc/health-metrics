@@ -28,7 +28,7 @@ import uk.gov.hmrc.healthmetrics.connector.ReleasesConnector.WhatsRunningWhere.D
 import uk.gov.hmrc.healthmetrics.connector.{ReleasesConnector, SlackNotificationsConnector, TeamsAndRepositoriesConnector}
 import uk.gov.hmrc.healthmetrics.model.*
 import uk.gov.hmrc.http.HeaderCarrier
-import java.time.temporal.ChronoUnit.{DAYS, MONTHS}
+import java.time.temporal.ChronoUnit.DAYS
 import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

@@ -26,6 +26,7 @@ import play.api.Configuration
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
+import uk.gov.hmrc.healthmetrics.model.{Environment, ServiceName, Version}
 
 import java.time.LocalDate
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -77,3 +78,80 @@ class ServiceConfigsConnectorSpec
         plugins   = List(sbtAutoBuild)
       , libraries = List(playFrontend)
       )
+
+  "ServiceConfigsConnector.appRoutes" should:
+    "return all of the routes for a given service:version" in:
+      stubFor:
+        get(urlEqualTo("/service-configs/app-routes/test-service/0.1.0"))
+          .willReturn:
+            aResponse()
+              .withStatus(200)
+              .withBody:
+                s"""{
+                      "service": "test-service",
+                      "version": "0.1.0",
+                      "routes": [
+                        {
+                          "verb": "GET",
+                          "path": "/test-service/hello-world",
+                          "controller": "uk.gov.hmrc.testservice.controller.HelloWorldController",
+                          "method": "helloWorld",
+                          "parameters": [],
+                          "modifiers": []
+                        }
+                      ],
+                      "unevaluatedRoutes": [
+                        {
+                          "path": "",
+                          "router": "health.Routes"
+                        }
+                      ]
+                    }"""
+
+      connector
+        .appRoutes(ServiceName("test-service"), Version("0.1.0"))
+        .futureValue shouldBe Some(
+          AppRoutes(
+            service = ServiceName("test-service"),
+            version = Version("0.1.0"),
+            paths   = Seq("/test-service/hello-world")
+          )
+        )
+
+    "return None when 404" in:
+      stubFor:
+        get(urlEqualTo("/service-configs/app-routes/nonsense-service/0.1.0"))
+          .willReturn:
+            aResponse()
+              .withStatus(404)
+
+      connector
+        .appRoutes(ServiceName("nonsense-service"), Version("0.1.0"))
+        .futureValue shouldBe None
+
+  "ServiceConfigsConnector.frontendRoutes" should:
+    "return routes for service" in:
+      stubFor:
+        get(urlEqualTo("/service-configs/routes?serviceName=test-service&environment=production&routeType=frontend"))
+          .willReturn:
+            aResponse()
+              .withStatus(200)
+              .withBody:
+                s"""[
+                      {
+                        "serviceName": "test-service",
+                        "path": "/test-service",
+                        "isRegex": false,
+                        "routeType": "frontend",
+                        "environment": "production"
+                      }
+                    ]"""
+
+      connector
+        .frontendRoutes(ServiceName("test-service"), Environment.Production, routeType = "frontend")
+        .futureValue shouldBe Seq(
+          FrontendRoute(
+            path    = "/test-service",
+            isRegex = false
+          )
+        )
