@@ -72,13 +72,17 @@ class ZapCoverageService @Inject()(
 
   private def getPublicPaths(service: ServiceName, version: Version)(using HeaderCarrier): Future[PathsWithPublicPrefixes] =
     for
-      frontendRoutes <- serviceConfigsConnector.frontendRoutes(service, Environment.QA, routeType = "frontend")
-      adminRoutes    <- serviceConfigsConnector.frontendRoutes(service, Environment.QA, routeType = "adminfrontend")
-      prodRoutes     =  frontendRoutes ++ adminRoutes
-      appRoutes      <- serviceConfigsConnector.appRoutes(service, version)
+      prodFrontendRoutes <- serviceConfigsConnector.frontendRoutes(service, Environment.Production, routeType = "frontend")
+      frontendRoutes     <- if prodFrontendRoutes.nonEmpty then Future.successful(prodFrontendRoutes)
+                            else serviceConfigsConnector.frontendRoutes(service, Environment.QA, routeType = "frontend")
+      prodAdminRoutes    <- serviceConfigsConnector.frontendRoutes(service, Environment.Production, routeType = "adminfrontend")
+      adminRoutes        <- if prodAdminRoutes.nonEmpty then Future.successful(prodAdminRoutes)
+                            else serviceConfigsConnector.frontendRoutes(service, Environment.QA, routeType = "adminfrontend")
+      prodRoutes         =  frontendRoutes ++ adminRoutes
+      appRoutes          <- serviceConfigsConnector.appRoutes(service, version)
     yield appRoutes match
       case Some(routes) =>
-        // TODO handle where frontendRoutes.isRegex = true
+        // TODO handle where frontendRoute.isRegex = true
         // e.g. https://github.com/hmrc/mdtp-frontend-routes/blob/108baca6a66c5a91708e532e24d24af6a8936f83/production/frontend-proxy-application-rules.conf#L57
         // might not be necessary once BDOG-3534 is played, as there is no need for regex in the yaml config
         val publicPrefixes = prodRoutes.map(_.path)
