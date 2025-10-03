@@ -23,7 +23,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.Configuration
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, RepoName, TeamName, ServiceName}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -227,7 +227,7 @@ class TeamsAndRepositoriesConnectorSpec
                     "testType": "Acceptance",
                     "latestBuild": {
                       "number": 3,
-                      "url": "https://build.tax.service.gov.uk//job/repo-1-tests/job/repo-1-tests-job/3/",
+                      "url": "https://build.tax.service.gov.uk/job/repo-1-tests/job/repo-1-tests-job/3/",
                       "timestamp": "2025-05-07T13:10:31.537Z",
                       "result": "FAILURE",
                       "description": "Accessibility issues: N/A, Security alerts: N/A",
@@ -284,10 +284,31 @@ class TeamsAndRepositoriesConnectorSpec
 
       connector
         .findTestJobs(TeamName("Team 1"): MetricFilter)
-        .futureValue shouldBe Seq(
-          JenkinsJob(Some(BuildData(Some("FAILURE"), Some(TestJobResults(None   , None   )))))
-        , JenkinsJob(Some(BuildData(Some("SUCCESS"), Some(TestJobResults(Some(0), Some(2))))))
-        )
+        .futureValue shouldBe:
+          JenkinsJob(
+            repoName    = RepoName("repo-1-tests")
+          , jobName     = "repo-1-tests-job"
+          , jenkinsUrl  = "https://build.tax.service.gov.uk/job/repo-1-tests/job/repo-1-tests-job/"
+          , jobType     = "test"
+          , testType    = Some("Acceptance")
+          , latestBuild = Some(BuildData(
+                            result         = Some("FAILURE")
+                          , testJobResults = Some(TestJobResults(None, None))
+                          , timestamp      = Instant.parse("2025-05-07T13:10:31.537Z")
+                          ))
+          ) ::
+          JenkinsJob(
+            repoName    = RepoName("repo-1-acceptance-tests")
+          , jobName     = "repo-1-ui-tests"
+          , jenkinsUrl  = "https://build.tax.service.gov.uk/job/Agents/job/repo-1-ui-tests/"
+          , jobType     = "test"
+          , testType    = Some("Acceptance")
+          , latestBuild = Some(BuildData(
+                            result         = Some("SUCCESS")
+                          , testJobResults = Some(TestJobResults(Some(0), Some(2)))
+                          , timestamp      =  Instant.parse("2025-06-12T11:28:29.277Z")
+                          ))
+          ) :: Nil
 
     "return test jobs for a digital service" in:
       stubFor:
@@ -363,7 +384,340 @@ class TeamsAndRepositoriesConnectorSpec
 
       connector
         .findTestJobs(DigitalService("Digital Service 1"): MetricFilter)
-        .futureValue shouldBe Seq(
-          JenkinsJob(Some(BuildData(Some("FAILURE"), Some(TestJobResults(None   , None   )))))
-        , JenkinsJob(Some(BuildData(Some("SUCCESS"), Some(TestJobResults(Some(0), Some(2))))))
-        )
+        .futureValue shouldBe:
+          JenkinsJob(
+            repoName    = RepoName("repo-1-tests")
+            , jobName     = "repo-1-tests-job"
+            , jenkinsUrl  = "https://build.tax.service.gov.uk/job/repo-1-tests/job/repo-1-tests-job/"
+            , jobType     = "test"
+            , testType    = Some("Acceptance")
+            , latestBuild = Some(BuildData(
+                                result         = Some("FAILURE")
+                              , testJobResults = Some(TestJobResults(None, None))
+                              , timestamp      = Instant.parse("2025-05-07T13:10:31.537Z")
+                            ))
+          ) ::
+          JenkinsJob(
+            repoName    = RepoName("repo-1-acceptance-tests")
+            , jobName     = "repo-1-ui-tests"
+            , jenkinsUrl  = "https://build.tax.service.gov.uk/job/Agents/job/repo-1-ui-tests/"
+            , jobType     = "test"
+            , testType    = Some("Acceptance")
+            , latestBuild = Some(BuildData(
+                                result         = Some("SUCCESS")
+                              , testJobResults = Some(TestJobResults(Some(0), Some(2)))
+                              , timestamp      = Instant.parse("2025-06-12T11:28:29.277Z")
+                            ))
+          ) :: Nil
+
+
+  "TeamsAndRepositoriesConnector.allTestJobs" should:
+    "return test jobs" in:
+      stubFor:
+        WireMock.get(urlEqualTo("/api/test-jobs"))
+          .willReturn:
+            aResponse()
+              .withStatus(200)
+              .withBody:
+                s"""[
+                  {
+                    "repoName": "repo-1-tests",
+                    "jobName": "repo-1-tests-job",
+                    "jenkinsURL": "https://build.tax.service.gov.uk/job/repo-1-tests/job/repo-1-tests-job/",
+                    "jobType": "test",
+                    "repoType": "Test",
+                    "testType": "Acceptance",
+                    "latestBuild": {
+                      "number": 3,
+                      "url": "https://build.tax.service.gov.uk/job/repo-1-tests/job/repo-1-tests-job/3/",
+                      "timestamp": "2025-05-07T13:10:31.537Z",
+                      "result": "FAILURE",
+                      "description": "Accessibility issues: N/A, Security alerts: N/A",
+                      "testJobResults": {
+                        "testJobBuilder": "UITestJobBuilder",
+                        "rawJson": {
+                          "testType": "UITests",
+                          "testJobBuilder": "UITestJobBuilder",
+                          "testDuration": "74"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "repoName": "repo-1-acceptance-tests",
+                    "jobName": "repo-1-ui-tests",
+                    "jenkinsURL": "https://build.tax.service.gov.uk/job/Agents/job/repo-1-ui-tests/",
+                    "jobType": "test",
+                    "repoType": "Test",
+                    "testType": "Acceptance",
+                    "latestBuild": {
+                      "number": 513,
+                      "url": "https://build.tax.service.gov.uk/job/Agents/job/repo-1-ui-tests/513/",
+                      "timestamp": "2025-06-12T11:28:29.277Z",
+                      "result": "SUCCESS",
+                      "description": "Accessibility issues: 0, Security alerts: 2",
+                      "testJobResults": {
+                        "numAccessibilityViolations": 0,
+                        "numSecurityAlerts": 2,
+                        "securityAssessmentBreakdown": {
+                          "High": 0,
+                          "Medium": 2,
+                          "Low": 0,
+                          "Informational": 2329
+                        },
+                        "testJobBuilder": "UITestJobBuilder",
+                        "rawJson": {
+                          "testType": "UITests",
+                          "testJobBuilder": "UITestJobBuilder",
+                          "testDuration": "629",
+                          "securityAlerts": "2",
+                          "alertsSummary": {
+                            "High": 0,
+                            "Low": 0,
+                            "Medium": 2,
+                            "Informational": 2329
+                          },
+                          "accessibilityViolations": "0"
+                        }
+                      }
+                    }
+                  }
+                ]"""
+
+      connector
+        .allTestJobs()
+        .futureValue shouldBe:
+          JenkinsJob(
+            repoName    = RepoName("repo-1-tests")
+            , jobName     = "repo-1-tests-job"
+            , jenkinsUrl  = "https://build.tax.service.gov.uk/job/repo-1-tests/job/repo-1-tests-job/"
+            , jobType     = "test"
+            , testType    = Some("Acceptance")
+            , latestBuild = Some(BuildData(
+                              result         = Some("FAILURE")
+                            , testJobResults = Some(TestJobResults(None, None))
+                            , timestamp      = Instant.parse("2025-05-07T13:10:31.537Z")
+                            ))
+          ) ::
+          JenkinsJob(
+            repoName    = RepoName("repo-1-acceptance-tests")
+            , jobName     = "repo-1-ui-tests"
+            , jenkinsUrl  = "https://build.tax.service.gov.uk/job/Agents/job/repo-1-ui-tests/"
+            , jobType     = "test"
+            , testType    = Some("Acceptance")
+            , latestBuild = Some(BuildData(
+                              result         = Some("SUCCESS")
+                            , testJobResults = Some(TestJobResults(Some(0), Some(2)))
+                            , timestamp      =  Instant.parse("2025-06-12T11:28:29.277Z")
+                            ))
+          ) :: Nil
+
+  "TeamsAndRepositoriesConnector.allTestRepos" should:
+    "return test repos" in:
+      stubFor:
+        WireMock.get(urlEqualTo("/api/v2/repositories?archived=false&repoType=Test"))
+          .willReturn:
+            aResponse()
+              .withStatus(200)
+              .withBody:
+                s"""[
+                  {
+                     "name": "tests-1",
+                     "organisation": "mdtp",
+                     "description": "",
+                     "url": "https://github.com/hmrc/tests-1",
+                     "createdDate": "2018-12-04T15:09:01Z",
+                     "lastActiveDate": "2025-01-17T09:38:08Z",
+                     "isPrivate": false,
+                     "repoType": "Test",
+                     "testType": "Performance",
+                     "owningTeams": [
+                       "TeamA"
+                     ],
+                     "language": "Scala",
+                     "isArchived": false,
+                     "defaultBranch": "main",
+                     "branchProtection": {
+                       "requiresApprovingReviews": true,
+                       "dismissesStaleReviews": true,
+                       "requiresCommitSignatures": true,
+                       "requiredStatusCheckContexts": [
+                       ]
+                     },
+                    "isDeprecated": false,
+                    "teamNames": [
+                      "TeamA"
+                    ],
+                    "repositoryYamlText": "repoVisibility: public"
+                  },
+                  {
+                    "name": "tests-2",
+                    "organisation": "mdtp",
+                    "description": "",
+                    "url": "https://github.com/hmrc/tests-2",
+                    "createdDate": "2024-09-05T13:27:23Z",
+                    "lastActiveDate": "2025-02-14T12:42:26Z",
+                    "isPrivate": false,
+                    "repoType": "Test",
+                    "testType": "Acceptance",
+                    "owningTeams": [
+                      "TeamB"
+                    ],
+                    "language": "Scala",
+                    "isArchived": false,
+                    "defaultBranch": "main",
+                    "branchProtection": {
+                      "requiresApprovingReviews": true,
+                      "dismissesStaleReviews": true,
+                      "requiresCommitSignatures": true,
+                      "requiredStatusCheckContexts": [
+                      ]
+                    },
+                    "isDeprecated": false,
+                    "teamNames": [
+                      "TeamB"
+                    ],
+                    "repositoryYamlText": "repoVisibility: public"
+                  }
+                ]"""
+
+      connector.allTestRepos().futureValue shouldBe:
+        Repo(RepoName("tests-1"), Seq(TeamName("TeamA")), None, false, Seq(TeamName("TeamA"))) ::
+        Repo(RepoName("tests-2"), Seq(TeamName("TeamB")), None, false, Seq(TeamName("TeamB"))) ::
+        Nil
+
+  "TeamsAndRepositoriesConnector.deletedServices" should:
+    "return deleted services" in:
+      stubFor:
+        WireMock.get(urlEqualTo("/api/deleted-repositories?repoType=Service"))
+          .willReturn:
+            aResponse()
+              .withStatus(200)
+              .withBody:
+                """[
+                  {
+                    "name": "service-1",
+                    "deletedDate": "2024-02-14T10:36:14.705Z",
+                    "organisation": "mdtp",
+                    "isPrivate": false,
+                    "repoType": "Service",
+                    "serviceType": "backend",
+                    "owningTeams": [
+                      "TeamA"
+                    ],
+                    "teamNames": [
+                      "TeamA"
+                    ]
+                  },
+                  {
+                    "name": "service-2",
+                    "deletedDate": "2024-02-14T10:36:42.133Z",
+                    "organisation": "mdtp",
+                    "isPrivate": false,
+                    "repoType": "Service",
+                    "serviceType": "frontend",
+                    "owningTeams": [
+                      "TeamB"
+                    ],
+                    "teamNames": [
+                      "TeamB"
+                    ]
+                  }
+                ]"""
+
+      connector.deletedServices().futureValue shouldBe:
+        ServiceName("service-1") ::
+        ServiceName("service-2") ::
+        Nil
+
+  "TeamsAndRepositoriesConnector.archivedServices" should:
+    "return archived services" in:
+      stubFor:
+        WireMock.get(urlEqualTo("/api/v2/repositories?archived=true&repoType=Service"))
+         .willReturn:
+           aResponse()
+             .withStatus(200)
+             .withBody:
+               """[
+                 {
+                   "name": "service-1",
+                   "organisation": "mdtp",
+                   "description": "",
+                   "url": "https://github.com/hmrc/service-1",
+                   "createdDate": "2025-07-29T10:01:05Z",
+                   "lastActiveDate": "2025-07-29T10:01:12Z",
+                   "isPrivate": true,
+                   "repoType": "Service",
+                   "serviceType": "frontend",
+                   "tags": [],
+                   "owningTeams": [
+                     "TeamA"
+                   ],
+                   "language": "Scala",
+                   "isArchived": true,
+                   "defaultBranch": "main",
+                   "branchProtection": {
+                     "requiresApprovingReviews": true,
+                     "dismissesStaleReviews": true,
+                     "requiresCommitSignatures": true,
+                     "requiredStatusCheckContexts": []
+                   },
+                   "isDeprecated": false,
+                   "teamNames": [
+                     "TeamA"
+                   ],
+                   "repositoryYamlText": "repoVisibility: private_"
+                 },
+                 {
+                   "name": "service-2",
+                   "organisation": "mdtp",
+                   "description": "",
+                   "url": "https://github.com/hmrc/service-2",
+                   "createdDate": "2021-10-26T12:57:18Z",
+                   "lastActiveDate": "2021-10-26T15:55:01Z",
+                   "isPrivate": false,
+                   "repoType": "Service",
+                   "serviceType": "frontend",
+                   "tags": [],
+                   "owningTeams": [
+                     "TeamB"
+                   ],
+                   "language": "Scala",
+                   "isArchived": true,
+                   "defaultBranch": "main",
+                   "branchProtection": {
+                     "requiresApprovingReviews": false,
+                     "dismissesStaleReviews": false,
+                     "requiresCommitSignatures": true,
+                     "requiredStatusCheckContexts": []
+                   },
+                   "isDeprecated": false,
+                   "teamNames": [
+                     "TeamB"
+                   ],
+                   "repositoryYamlText": "repoVisibility: public_"
+                 }
+               ]"""
+
+      connector.archivedServices().futureValue shouldBe:
+        ServiceName("service-1") ::
+        ServiceName("service-2") ::
+        Nil
+
+  "TeamsAndRepositoriesConnector.servicesUnderTest" should:
+    "return services that are tested via a test repo" in:
+      stubFor:
+        WireMock.get(urlEqualTo("/api/v2/repositories/test-repo-1/services-under-test"))
+          .willReturn:
+            aResponse()
+              .withStatus(200)
+              .withBody:
+                """[
+                  "service-1",
+                  "service-2"
+                ]"""
+                
+      connector.servicesUnderTest(RepoName("test-repo-1")).futureValue shouldBe:
+        ServiceName("service-1") ::
+        ServiceName("service-2") ::
+        Nil

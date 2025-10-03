@@ -22,7 +22,7 @@ import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 import uk.gov.hmrc.healthmetrics.connector.TeamsAndRepositoriesConnector.JenkinsJob
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, TeamName, RepoName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, RepoName, ServiceName, TeamName}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -46,6 +46,12 @@ class TeamsAndRepositoriesConnector @Inject()(
     httpClientV2
       .get(url"$url/api/v2/repositories?organisation=mdtp&archived=false")
       .execute[Seq[TeamsAndRepositoriesConnector.Repo]]
+
+  def allTestRepos()(using HeaderCarrier): Future[Seq[TeamsAndRepositoriesConnector.Repo]] =
+    given Reads[TeamsAndRepositoriesConnector.Repo] = TeamsAndRepositoriesConnector.Repo.reads
+    httpClientV2
+     .get(url"$url/api/v2/repositories?archived=false&repoType=Test")
+     .execute[Seq[TeamsAndRepositoriesConnector.Repo]]
 
   def allTeams()(using HeaderCarrier): Future[Seq[TeamsAndRepositoriesConnector.GitHubTeam]] =
     given Reads[TeamsAndRepositoriesConnector.GitHubTeam] = TeamsAndRepositoriesConnector.GitHubTeam.reads
@@ -77,6 +83,12 @@ class TeamsAndRepositoriesConnector @Inject()(
       .execute[Seq[JsValue]]
       .map(_.size)
 
+  def allTestJobs()(using HeaderCarrier): Future[Seq[JenkinsJob]] =
+    given Reads[JenkinsJob] = JenkinsJob.reads
+    httpClientV2
+      .get(url"$url/api/test-jobs")
+      .execute[Seq[JenkinsJob]]
+
   def findTestJobs(metricFilter: MetricFilter)(using HeaderCarrier): Future[Seq[JenkinsJob]] =
     given Reads[JenkinsJob] = JenkinsJob.reads
 
@@ -88,16 +100,40 @@ class TeamsAndRepositoriesConnector @Inject()(
       .get(url"$url/api/test-jobs?${params(metricFilter)}")
       .execute[Seq[JenkinsJob]]
 
+  def deletedServices()(using HeaderCarrier): Future[Seq[ServiceName]] =
+    given Reads[ServiceName] = ServiceName.nameReads
+    httpClientV2
+      .get(url"$url/api/deleted-repositories?repoType=Service")
+      .execute[Seq[ServiceName]]
+
+  def archivedServices()(using HeaderCarrier): Future[Seq[ServiceName]] =
+    given Reads[ServiceName] = ServiceName.nameReads
+    httpClientV2
+      .get(url"$url/api/v2/repositories?archived=true&repoType=Service")
+      .execute[Seq[ServiceName]]
+
+  def servicesUnderTest(testRepo: RepoName)(using HeaderCarrier): Future[Seq[ServiceName]] =
+    httpClientV2
+      .get(url"$url/api/v2/repositories/${testRepo.asString}/services-under-test")
+      .execute[Seq[ServiceName]]
 
 object TeamsAndRepositoriesConnector:
 
-  case class Repo(repoName: RepoName, teamNames: Seq[TeamName],  endOfLifeDate: Option[Instant], isDeprecated: Boolean = false)
+  case class Repo(
+    repoName     : RepoName
+  , teamNames    : Seq[TeamName]
+  , endOfLifeDate: Option[Instant]
+  , isDeprecated : Boolean = false
+  , owningTeams  : Seq[TeamName] = Seq.empty
+  )
+
   object Repo:
     val reads: Reads[Repo] =
       ( (__ \ "name"         ).read[String].map(RepoName.apply)
       ~ (__ \ "teamNames"    ).read[Seq[TeamName]]
       ~ (__ \ "endOfLifeDate").readNullable[Instant]
       ~ (__ \ "isDeprecated" ).readWithDefault[Boolean](false)
+      ~ (__ \ "owningTeams"  ).read[Seq[TeamName]]
       )(Repo.apply _)
 
   case class GitHubTeam(
@@ -125,18 +161,33 @@ object TeamsAndRepositoriesConnector:
       )(TestJobResults.apply)
 
   case class BuildData(
-    result        : Option[String],
-    testJobResults: Option[TestJobResults] = None
+    result        : Option[String]
+  , testJobResults: Option[TestJobResults] = None
+  , timestamp     : Instant
   )
 
   object BuildData:
     val reads: Reads[BuildData] =
       ( (__ \ "result"        ).readNullable[String]
       ~ (__ \ "testJobResults").readNullable[TestJobResults](TestJobResults.reads)
+      ~ (__ \ "timestamp"     ).read[Instant]
       )(BuildData.apply)
 
-  case class JenkinsJob(latestBuild: Option[BuildData])
+  case class JenkinsJob(
+    repoName   : RepoName
+  , jobName    : String
+  , jenkinsUrl : String
+  , jobType    : String
+  , testType   : Option[String]
+  , latestBuild: Option[BuildData]
+  )
 
   object JenkinsJob:
     val reads: Reads[JenkinsJob] =
-      (__ \ "latestBuild").readNullable[BuildData](BuildData.reads).map(JenkinsJob.apply)
+      ( (__ \ "repoName"   ).read[String].map(RepoName.apply)
+      ~ (__ \ "jobName"    ).read[String]
+      ~ (__ \ "jenkinsURL" ).read[String]
+      ~ (__ \ "jobType"    ).read[String]
+      ~ (__ \ "testType"   ).readNullable[String]
+      ~ (__ \ "latestBuild").readNullable[BuildData](BuildData.reads)
+      )(JenkinsJob.apply _)

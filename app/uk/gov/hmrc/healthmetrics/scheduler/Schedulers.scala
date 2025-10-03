@@ -44,6 +44,7 @@ class Schedulers @Inject()(
 , outdatedDeploymentNotifierService       : OutdatedDeploymentNotifierService
 , productionVulnerabilitiesNotifierService: ProductionVulnerabilitiesNotifierService
 , upcomingBobbyNotifierService            : UpcomingBobbyNotifierService
+, inactiveTestRepoService                 : InactiveTestRepoService
 , mongoLockRepository                     : MongoLockRepository
 , lastRunRepository                       : LastRunRepository
 , teamHealthMetricsRepository             : TeamHealthMetricsRepository
@@ -117,6 +118,10 @@ class Schedulers @Inject()(
   scheduleWithLock("Outdated Deployment Notifier", "outdated-deployment-notifier"): schedulerConfig =>
     run(schedulerConfig):
       outdatedDeploymentNotifierService.notify(Instant.now())
+  
+  scheduleWithLock("Inactive Test Repositories Notifier", "inactive-test-repositories-notifier"): schedulerConfig =>
+    run(schedulerConfig):
+      inactiveTestRepoService.notify
 
   private def run(schedulerConfig: SchedulerConfig)(f: => Future[Unit]): Future[Unit] =
     val now   = Instant.now()
