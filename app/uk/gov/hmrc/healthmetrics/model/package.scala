@@ -63,6 +63,10 @@ package object model:
 
   case class ServiceName(asString: String) extends AnyVal
 
+  object ServiceName extends StringAnyValUtils(ServiceName.apply, _.asString):
+    val nameReads: Reads[ServiceName] =
+      (__ \ "name").read[String].map(ServiceName.apply)
+
   case class RepoName(asString: String) extends AnyVal
 
   given Parser[Environment] = Parser.parser(Environment.values)
