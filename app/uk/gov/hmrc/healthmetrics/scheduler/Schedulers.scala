@@ -132,7 +132,7 @@ class Schedulers @Inject()(
         .get(schedulerConfig.lockId)
         .flatMap:
           case Some(last) if last.isAfter(after) =>
-            logger.info(s"Not running ${schedulerConfig.label} Scheduler - waiting till e: $last is after $after and inside working hours")
+            logger.info(s"Not running ${schedulerConfig.label} Scheduler - waiting till: $last is after $after and inside working hours")
             Future.unit
           case oLast =>
             logger.info(oLast.fold(s"Running ${schedulerConfig.label} Scheduler for the first time")(d => s"Running ${schedulerConfig.label} Scheduler. Last run date was $d"))

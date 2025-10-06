@@ -67,7 +67,8 @@ package object model:
     val nameReads: Reads[ServiceName] =
       (__ \ "name").read[String].map(ServiceName.apply)
 
-  case class RepoName(asString: String) extends AnyVal
+  case class RepoName(asString: String) extends AnyVal:
+    override def toString: String = asString
 
   given Parser[Environment] = Parser.parser(Environment.values)
 

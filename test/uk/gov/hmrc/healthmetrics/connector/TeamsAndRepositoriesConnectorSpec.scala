@@ -290,9 +290,9 @@ class TeamsAndRepositoriesConnectorSpec
           , jobName     = "repo-1-tests-job"
           , jenkinsUrl  = "https://build.tax.service.gov.uk/job/repo-1-tests/job/repo-1-tests-job/"
           , jobType     = "test"
-          , testType    = Some("Acceptance")
+          , testType    = Some(TestType.Acceptance)
           , latestBuild = Some(BuildData(
-                            result         = Some("FAILURE")
+                            result         = Some(BuildResult.Failure)
                           , testJobResults = Some(TestJobResults(None, None))
                           , timestamp      = Instant.parse("2025-05-07T13:10:31.537Z")
                           ))
@@ -302,9 +302,9 @@ class TeamsAndRepositoriesConnectorSpec
           , jobName     = "repo-1-ui-tests"
           , jenkinsUrl  = "https://build.tax.service.gov.uk/job/Agents/job/repo-1-ui-tests/"
           , jobType     = "test"
-          , testType    = Some("Acceptance")
+          , testType    = Some(TestType.Acceptance)
           , latestBuild = Some(BuildData(
-                            result         = Some("SUCCESS")
+                            result         = Some(BuildResult.Success)
                           , testJobResults = Some(TestJobResults(Some(0), Some(2)))
                           , timestamp      =  Instant.parse("2025-06-12T11:28:29.277Z")
                           ))
@@ -390,9 +390,9 @@ class TeamsAndRepositoriesConnectorSpec
             , jobName     = "repo-1-tests-job"
             , jenkinsUrl  = "https://build.tax.service.gov.uk/job/repo-1-tests/job/repo-1-tests-job/"
             , jobType     = "test"
-            , testType    = Some("Acceptance")
+            , testType    = Some(TestType.Acceptance)
             , latestBuild = Some(BuildData(
-                                result         = Some("FAILURE")
+                                result         = Some(BuildResult.Failure)
                               , testJobResults = Some(TestJobResults(None, None))
                               , timestamp      = Instant.parse("2025-05-07T13:10:31.537Z")
                             ))
@@ -402,9 +402,9 @@ class TeamsAndRepositoriesConnectorSpec
             , jobName     = "repo-1-ui-tests"
             , jenkinsUrl  = "https://build.tax.service.gov.uk/job/Agents/job/repo-1-ui-tests/"
             , jobType     = "test"
-            , testType    = Some("Acceptance")
+            , testType    = Some(TestType.Acceptance)
             , latestBuild = Some(BuildData(
-                                result         = Some("SUCCESS")
+                                result         = Some(BuildResult.Success)
                               , testJobResults = Some(TestJobResults(Some(0), Some(2)))
                               , timestamp      = Instant.parse("2025-06-12T11:28:29.277Z")
                             ))
@@ -492,9 +492,9 @@ class TeamsAndRepositoriesConnectorSpec
             , jobName     = "repo-1-tests-job"
             , jenkinsUrl  = "https://build.tax.service.gov.uk/job/repo-1-tests/job/repo-1-tests-job/"
             , jobType     = "test"
-            , testType    = Some("Acceptance")
+            , testType    = Some(TestType.Acceptance)
             , latestBuild = Some(BuildData(
-                              result         = Some("FAILURE")
+                              result         = Some(BuildResult.Failure)
                             , testJobResults = Some(TestJobResults(None, None))
                             , timestamp      = Instant.parse("2025-05-07T13:10:31.537Z")
                             ))
@@ -504,9 +504,9 @@ class TeamsAndRepositoriesConnectorSpec
             , jobName     = "repo-1-ui-tests"
             , jenkinsUrl  = "https://build.tax.service.gov.uk/job/Agents/job/repo-1-ui-tests/"
             , jobType     = "test"
-            , testType    = Some("Acceptance")
+            , testType    = Some(TestType.Acceptance)
             , latestBuild = Some(BuildData(
-                              result         = Some("SUCCESS")
+                              result         = Some(BuildResult.Success)
                             , testJobResults = Some(TestJobResults(Some(0), Some(2)))
                             , timestamp      =  Instant.parse("2025-06-12T11:28:29.277Z")
                             ))
@@ -584,140 +584,4 @@ class TeamsAndRepositoriesConnectorSpec
       connector.allTestRepos().futureValue shouldBe:
         Repo(RepoName("tests-1"), Seq(TeamName("TeamA")), None, false, Seq(TeamName("TeamA"))) ::
         Repo(RepoName("tests-2"), Seq(TeamName("TeamB")), None, false, Seq(TeamName("TeamB"))) ::
-        Nil
-
-  "TeamsAndRepositoriesConnector.deletedServices" should:
-    "return deleted services" in:
-      stubFor:
-        WireMock.get(urlEqualTo("/api/deleted-repositories?repoType=Service"))
-          .willReturn:
-            aResponse()
-              .withStatus(200)
-              .withBody:
-                """[
-                  {
-                    "name": "service-1",
-                    "deletedDate": "2024-02-14T10:36:14.705Z",
-                    "organisation": "mdtp",
-                    "isPrivate": false,
-                    "repoType": "Service",
-                    "serviceType": "backend",
-                    "owningTeams": [
-                      "TeamA"
-                    ],
-                    "teamNames": [
-                      "TeamA"
-                    ]
-                  },
-                  {
-                    "name": "service-2",
-                    "deletedDate": "2024-02-14T10:36:42.133Z",
-                    "organisation": "mdtp",
-                    "isPrivate": false,
-                    "repoType": "Service",
-                    "serviceType": "frontend",
-                    "owningTeams": [
-                      "TeamB"
-                    ],
-                    "teamNames": [
-                      "TeamB"
-                    ]
-                  }
-                ]"""
-
-      connector.deletedServices().futureValue shouldBe:
-        ServiceName("service-1") ::
-        ServiceName("service-2") ::
-        Nil
-
-  "TeamsAndRepositoriesConnector.archivedServices" should:
-    "return archived services" in:
-      stubFor:
-        WireMock.get(urlEqualTo("/api/v2/repositories?archived=true&repoType=Service"))
-         .willReturn:
-           aResponse()
-             .withStatus(200)
-             .withBody:
-               """[
-                 {
-                   "name": "service-1",
-                   "organisation": "mdtp",
-                   "description": "",
-                   "url": "https://github.com/hmrc/service-1",
-                   "createdDate": "2025-07-29T10:01:05Z",
-                   "lastActiveDate": "2025-07-29T10:01:12Z",
-                   "isPrivate": true,
-                   "repoType": "Service",
-                   "serviceType": "frontend",
-                   "tags": [],
-                   "owningTeams": [
-                     "TeamA"
-                   ],
-                   "language": "Scala",
-                   "isArchived": true,
-                   "defaultBranch": "main",
-                   "branchProtection": {
-                     "requiresApprovingReviews": true,
-                     "dismissesStaleReviews": true,
-                     "requiresCommitSignatures": true,
-                     "requiredStatusCheckContexts": []
-                   },
-                   "isDeprecated": false,
-                   "teamNames": [
-                     "TeamA"
-                   ],
-                   "repositoryYamlText": "repoVisibility: private_"
-                 },
-                 {
-                   "name": "service-2",
-                   "organisation": "mdtp",
-                   "description": "",
-                   "url": "https://github.com/hmrc/service-2",
-                   "createdDate": "2021-10-26T12:57:18Z",
-                   "lastActiveDate": "2021-10-26T15:55:01Z",
-                   "isPrivate": false,
-                   "repoType": "Service",
-                   "serviceType": "frontend",
-                   "tags": [],
-                   "owningTeams": [
-                     "TeamB"
-                   ],
-                   "language": "Scala",
-                   "isArchived": true,
-                   "defaultBranch": "main",
-                   "branchProtection": {
-                     "requiresApprovingReviews": false,
-                     "dismissesStaleReviews": false,
-                     "requiresCommitSignatures": true,
-                     "requiredStatusCheckContexts": []
-                   },
-                   "isDeprecated": false,
-                   "teamNames": [
-                     "TeamB"
-                   ],
-                   "repositoryYamlText": "repoVisibility: public_"
-                 }
-               ]"""
-
-      connector.archivedServices().futureValue shouldBe:
-        ServiceName("service-1") ::
-        ServiceName("service-2") ::
-        Nil
-
-  "TeamsAndRepositoriesConnector.servicesUnderTest" should:
-    "return services that are tested via a test repo" in:
-      stubFor:
-        WireMock.get(urlEqualTo("/api/v2/repositories/test-repo-1/services-under-test"))
-          .willReturn:
-            aResponse()
-              .withStatus(200)
-              .withBody:
-                """[
-                  "service-1",
-                  "service-2"
-                ]"""
-                
-      connector.servicesUnderTest(RepoName("test-repo-1")).futureValue shouldBe:
-        ServiceName("service-1") ::
-        ServiceName("service-2") ::
         Nil

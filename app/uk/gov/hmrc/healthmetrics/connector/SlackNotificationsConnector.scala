@@ -17,7 +17,7 @@
 package uk.gov.hmrc.healthmetrics.connector
 
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
-import play.api.libs.json._
+import play.api.libs.json.*
 import play.api.libs.ws.JsonBodyWritables.writeableOf_JsValue
 import play.api.{Configuration, Logging}
 import uk.gov.hmrc.http.client.HttpClientV2
