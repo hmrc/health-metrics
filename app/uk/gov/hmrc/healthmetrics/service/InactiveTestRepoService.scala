@@ -17,8 +17,9 @@
 package uk.gov.hmrc.healthmetrics.service
 
 import uk.gov.hmrc.healthmetrics.connector.{SlackNotificationsConnector, TeamsAndRepositoriesConnector}
+import uk.gov.hmrc.healthmetrics.connector.TeamsAndRepositoriesConnector.{BuildResult, TestType}
+import uk.gov.hmrc.healthmetrics.service.InactiveTestRepoService.InactiveTestRepo
 import uk.gov.hmrc.healthmetrics.model.{RepoName, TeamName}
-import uk.gov.hmrc.healthmetrics.model.InactiveTestRepo
 import uk.gov.hmrc.http.HeaderCarrier
 
 import java.time.Instant
@@ -27,6 +28,7 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import cats.syntax.all.*
 import play.api.Logging
+
 
 @Singleton
 class InactiveTestRepoService @Inject()(
@@ -44,73 +46,69 @@ class InactiveTestRepoService @Inject()(
     for
       allTestRepos     <- teamsAndRepositoriesConnector.allTestRepos()
       allTestJobs      <- teamsAndRepositoriesConnector.allTestJobs()
-      oldJobs          =  allTestJobs.flatMap: job =>
-                            val owningTeams: Seq[TeamName] = allTestRepos.find(_.repoName == job.repoName).map(_.owningTeams).getOrElse(Seq.empty)
+      reposWithOldJobs =  allTestJobs.flatMap: job =>
+                            val owningTeams = allTestRepos.find(_.repoName == job.repoName).map(_.owningTeams).getOrElse(Seq.empty[TeamName])
                             job.latestBuild match
                               // 360+ days, Performance tests (any build status)
-                              case Some(build) if build.timestamp.isBefore(oldBuildCutoff) && job.testType.contains("Performance")
+                              case Some(build) if build.timestamp.isBefore(oldBuildCutoff) && job.testType.contains(TestType.Performance)
                                                => build.result.map: result =>
                                                     InactiveTestRepo(
-                                                      job.repoName
-                                                    , job.jobName
-                                                    , job.jenkinsUrl
-                                                    , "Performance"
-                                                    , s"$result +360 days"
-                                                    , build.timestamp.toString
-                                                    , owningTeams
+                                                      repoName    = job.repoName
+                                                    , message     = s"${job.repoName} has a ${job.testType} job: <${job.jenkinsUrl}|${job.jobName}> that hasn’t run in 360 days."
+                                                    , owningTeams = owningTeams
                                                     )
                               // 360+ days, all other tests
                               case Some(build) if build.timestamp.isBefore(oldBuildCutoff)
                                                => build.result.map: result =>
-                                                   InactiveTestRepo(
-                                                     job.repoName
-                                                   , job.jobName
-                                                   , job.jenkinsUrl
-                                                   , job.testType.getOrElse("")
-                                                   , s"$result +360 days"
-                                                   , build.timestamp.toString
-                                                   , owningTeams
-                                                   )
+                                                    InactiveTestRepo(
+                                                      repoName    = job.repoName
+                                                    , message     = s"${job.repoName} has a ${job.testType.getOrElse("")} job: <${job.jenkinsUrl}|${job.jobName}> that hasn’t run in 360 days."
+                                                    , owningTeams = owningTeams
+                                                    )
                               // 90+ days, Acceptance tests (any build status)
-                              case Some(build) if build.timestamp.isBefore(acceptanceCutoff) && job.testType == Some("Acceptance")
+                              case Some(build) if build.timestamp.isBefore(acceptanceCutoff) && job.testType.contains(TestType.Acceptance)
                                                => build.result.map: result =>
-                                                   InactiveTestRepo(
-                                                     job.repoName
-                                                   , job.jobName
-                                                   , job.jenkinsUrl
-                                                   , "Acceptance"
-                                                   , s"$result +90 days"
-                                                   , build.timestamp.toString
-                                                   , owningTeams
-                                                   )
-                              // 30+ days, other tests (only FAILURE or UNSTABLE)
-                              case Some(build) if build.timestamp.isBefore(failedBuildCutoff) && job.testType != Some("Performance") && job.testType != Some("Acceptance")
-                                               => build.result.filter(r => r == "FAILURE" || r == "UNSTABLE").map: result =>
-                                                   InactiveTestRepo(
-                                                     job.repoName
-                                                   , job.jobName
-                                                   , job.jenkinsUrl
-                                                   , job.testType.getOrElse("")
-                                                   , s"$result +30 days"
-                                                   , build.timestamp.toString
-                                                   , owningTeams
-                                                   )
+                                                    InactiveTestRepo(
+                                                      repoName    = job.repoName
+                                                    , message     = s"${job.repoName} has a ${job.testType} job: <${job.jenkinsUrl}|${job.jobName}> that hasn’t run in 90 days."
+                                                    , owningTeams = owningTeams
+                                                    )
+                              // 30+ days, other tests (only FAILURE or UNSTABLE or ABORTED)
+                              case Some(build) if build.timestamp.isBefore(failedBuildCutoff)
+                                               && !job.testType.contains(TestType.Performance)
+                                               && !job.testType.contains(TestType.Acceptance)
+                                               => build.result
+                                                    .filter: r =>
+                                                         r == BuildResult.Failure
+                                                      || r == BuildResult.Unstable
+                                                      || r == BuildResult.Aborted
+                                                    .map: result =>
+                                                      InactiveTestRepo(
+                                                        repoName    = job.repoName
+                                                      , message     = s"${job.repoName} has a ${job.testType.getOrElse("")} job: <${job.jenkinsUrl}|${job.jobName}> that hasn’t run in 30 days."
+                                                      , owningTeams = owningTeams
+                                                      )
                               // No build record
-                              case None        => Some(InactiveTestRepo(job.repoName, job.jobName, job.jenkinsUrl, job.testType.getOrElse(""), "NO RECORD", "", owningTeams))
+                              case None        => Some(InactiveTestRepo(
+                                                    repoName    = job.repoName
+                                                  , message     = s"${job.repoName} has a ${job.testType.getOrElse("")} job: <${job.jenkinsUrl}|${job.jobName}> that has no build record."
+                                                  , owningTeams = owningTeams
+                                                  ))
                               case _           => None
-      noJobs           =  allTestRepos.filterNot(repo => allTestJobs.map(_.repoName).contains(repo.repoName)).map(repo => InactiveTestRepo(repoName = repo.repoName, jobName = "", jenkinsUrl = "", testType = "", buildStatus = "NO JOB", timestamp = "", owningTeams = repo.owningTeams))
-      abTestRepos      =  oldJobs ++ noJobs
-      deletedServices  <- teamsAndRepositoriesConnector.deletedServices()
-      archivedServices <- teamsAndRepositoriesConnector.archivedServices()
-      services         =  (deletedServices ++ archivedServices).toSet
-      withUnderTest    <- abTestRepos.foldLeftM(Seq.empty[InactiveTestRepo]): (acc, testRepo) =>
-                            teamsAndRepositoriesConnector.servicesUnderTest(testRepo.repoName).map: s =>
-                              acc :+ testRepo.copy(services = s.filter(services.contains))
-      groupedByTeam    =  withUnderTest
-                            .take(4)
+      reposWithNoJobs  =  allTestRepos
+                            .filterNot(testRepo => allTestJobs.map(_.repoName).contains(testRepo.repoName))
+                            .map: repo =>
+                              InactiveTestRepo(
+                                repoName    = repo.repoName
+                              , message     = s"${repo.repoName} has no job defined in Jenkins Github repositories."
+                              , owningTeams = repo.owningTeams
+                              )
+      groupedByTeam    =  (reposWithOldJobs ++ reposWithNoJobs)
                             .map(repo => Map(TeamName("PlatOps") -> Seq(repo)))
                             .combineAll
-      responses        <- groupedByTeam.toList.foldLeftM(List.empty[(TeamName, SlackNotificationsConnector.Response)]):
+      filteredCIP      =  groupedByTeam.filterNot:
+                            (team, _) => team.asString.split("\\s+").contains("CIP")
+      responses        <- filteredCIP.toList.foldLeftM(List.empty[(TeamName, SlackNotificationsConnector.Response)]):
                             (acc, inactiveTestRepos) =>
                               val (team, testRepos) = inactiveTestRepos
                               slackNotificationsConnector
@@ -121,13 +119,12 @@ class InactiveTestRepoService @Inject()(
                            case (team, _)                          => logger.info(s"Successfully sent Inactive Test Repository message to ${team.asString}")
     yield ()
 
-
   private def infoNotification(teamName: TeamName, testRepos: Seq[InactiveTestRepo]): SlackNotificationsConnector.Request =
     val heading = SlackNotificationsConnector.mrkdwnBlock:
-      ":alarm: ACTION REQUIRED! :alarm:"
+      ":magnifying_glass: *Investigation Required!* :magnifying_glass:"
 
     val msg = SlackNotificationsConnector.mrkdwnBlock:
-      s"Hello ${teamName.asString}, the following test repositories may be inactive:"
+      s"Hello ${teamName.asString}, the following test repositories may be inactive please review:"
 
     val warnings =
       testRepos
@@ -137,7 +134,7 @@ class InactiveTestRepoService @Inject()(
         .map: batch =>
           SlackNotificationsConnector.mrkdwnBlock:
             batch
-              .map(testRepo => s"• ${testRepo.repoName} has a ${testRepo.testType} job: <${testRepo.jenkinsUrl}|${testRepo.jobName}> that needs review")
+              .map(testRepo => s"• ${testRepo.message}")
               .mkString("\\n")
         .toSeq
 
@@ -152,3 +149,10 @@ class InactiveTestRepoService @Inject()(
       blocks          = Seq(heading, msg) ++ warnings :+ link,
       callbackChannel = Some("team-platops-alerts")
     )
+
+object InactiveTestRepoService:
+  private[InactiveTestRepoService] case class InactiveTestRepo(
+    repoName   : RepoName
+  , message    : String
+  , owningTeams: Seq[TeamName]
+  )

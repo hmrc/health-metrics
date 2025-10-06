@@ -22,7 +22,7 @@ import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 import uk.gov.hmrc.healthmetrics.connector.TeamsAndRepositoriesConnector.JenkinsJob
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, RepoName, ServiceName, TeamName}
+import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, RepoName, TeamName}
 
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
@@ -100,23 +100,6 @@ class TeamsAndRepositoriesConnector @Inject()(
       .get(url"$url/api/test-jobs?${params(metricFilter)}")
       .execute[Seq[JenkinsJob]]
 
-  def deletedServices()(using HeaderCarrier): Future[Seq[ServiceName]] =
-    given Reads[ServiceName] = ServiceName.nameReads
-    httpClientV2
-      .get(url"$url/api/deleted-repositories?repoType=Service")
-      .execute[Seq[ServiceName]]
-
-  def archivedServices()(using HeaderCarrier): Future[Seq[ServiceName]] =
-    given Reads[ServiceName] = ServiceName.nameReads
-    httpClientV2
-      .get(url"$url/api/v2/repositories?archived=true&repoType=Service")
-      .execute[Seq[ServiceName]]
-
-  def servicesUnderTest(testRepo: RepoName)(using HeaderCarrier): Future[Seq[ServiceName]] =
-    httpClientV2
-      .get(url"$url/api/v2/repositories/${testRepo.asString}/services-under-test")
-      .execute[Seq[ServiceName]]
-
 object TeamsAndRepositoriesConnector:
 
   case class Repo(
@@ -160,25 +143,55 @@ object TeamsAndRepositoriesConnector:
       ~ (__ \ "numSecurityAlerts"         ).readNullable[Int]
       )(TestJobResults.apply)
 
+  enum BuildResult(val asString: String):
+    case Failure  extends BuildResult("FAILURE" )
+    case Success  extends BuildResult("SUCCESS" )
+    case Aborted  extends BuildResult("ABORTED" )
+    case Unstable extends BuildResult("UNSTABLE")
+    case Other    extends BuildResult("Other"   )
+
+  object BuildResult:
+    def parse(s: String): BuildResult =
+      values
+        .find(_.asString.equalsIgnoreCase(s)).getOrElse(Other)
+
+    given reads: Reads[BuildResult] =
+      Reads.of[String].map(parse)
+
   case class BuildData(
-    result        : Option[String]
+    result        : Option[BuildResult]
   , testJobResults: Option[TestJobResults] = None
   , timestamp     : Instant
   )
 
   object BuildData:
     val reads: Reads[BuildData] =
-      ( (__ \ "result"        ).readNullable[String]
+      ( (__ \ "result"        ).readNullable[BuildResult]
       ~ (__ \ "testJobResults").readNullable[TestJobResults](TestJobResults.reads)
       ~ (__ \ "timestamp"     ).read[Instant]
       )(BuildData.apply)
+
+  enum TestType(val asString: String):
+    case Acceptance  extends TestType("Acceptance")
+    case Performance extends TestType("Performance")
+    case Contract    extends TestType("Contract")
+    case Other       extends TestType("Other")
+
+  object TestType:
+    def parse(s: String): TestType =
+      values
+        .find(_.asString.equalsIgnoreCase(s)).getOrElse(Other)
+
+    given reads: Reads[TestType] =
+      Reads.of[String].map(parse)
+
 
   case class JenkinsJob(
     repoName   : RepoName
   , jobName    : String
   , jenkinsUrl : String
   , jobType    : String
-  , testType   : Option[String]
+  , testType   : Option[TestType]
   , latestBuild: Option[BuildData]
   )
 
@@ -188,6 +201,6 @@ object TeamsAndRepositoriesConnector:
       ~ (__ \ "jobName"    ).read[String]
       ~ (__ \ "jenkinsURL" ).read[String]
       ~ (__ \ "jobType"    ).read[String]
-      ~ (__ \ "testType"   ).readNullable[String]
+      ~ (__ \ "testType"   ).readNullable[TestType]
       ~ (__ \ "latestBuild").readNullable[BuildData](BuildData.reads)
       )(JenkinsJob.apply _)
