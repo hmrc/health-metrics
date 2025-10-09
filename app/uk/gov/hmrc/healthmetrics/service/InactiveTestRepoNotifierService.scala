@@ -92,9 +92,6 @@ class InactiveTestRepoNotifierService @Inject()(
     yield ()
 
   private def infoNotification(teamName: TeamName, testRepos: Seq[InactiveTestRepo]): SlackNotificationsConnector.Request =
-    val heading = SlackNotificationsConnector.mrkdwnBlock:
-      "*Investigation Required!*"
-
     val msg = SlackNotificationsConnector.mrkdwnBlock:
       s"Hello ${teamName.asString}, the following test repositories may be inactive please review:"
 
@@ -102,7 +99,7 @@ class InactiveTestRepoNotifierService @Inject()(
       testRepos
         .toList
         .sortBy(_.repoName.asString)
-        .grouped(10)
+        .grouped(5)
         .map: batch =>
           SlackNotificationsConnector.mrkdwnBlock:
             batch
@@ -118,7 +115,7 @@ class InactiveTestRepoNotifierService @Inject()(
       displayName     = "MDTP Catalogue",
       emoji           = ":tudor-crown:",
       text            = "The test repositories may be inactive",
-      blocks          = Seq(heading, msg) ++ warnings :+ link,
+      blocks          = Seq(msg) ++ warnings :+ link,
       callbackChannel = Some("team-platops-alerts")
     )
 
