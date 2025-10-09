@@ -37,11 +37,11 @@ class InactiveTestRepoNotifierService @Inject()(
 )(using
   ec: ExecutionContext
 ) extends Logging:
-  
+
   private val oldBuildCutoff    = configuration.get[Duration]("inactive-test-repositories-jobs.oldBuildCutoff")
   private val acceptanceCutoff  = configuration.get[Duration]("inactive-test-repositories-jobs.acceptanceCutoff")
   private val failedBuildCutoff = configuration.get[Duration]("inactive-test-repositories-jobs.failedBuildCutoff")
-  
+
   def notify(now: Instant)(using hc: HeaderCarrier): Future[Unit] =
     for
       allTestRepos     <- teamsAndRepositoriesConnector.allTestRepos()
@@ -76,7 +76,7 @@ class InactiveTestRepoNotifierService @Inject()(
                             .map: repo =>
                               InactiveTestRepo(repo.repoName, s"<https://catalogue.tax.service.gov.uk/repositories/${repo.repoName}|${repo.repoName}> has no test job defined in Jenkins Github repositories.", repo.owningTeams)
       filteredByCip    =  (reposWithOldJobs ++ reposWithNoJobs).filterNot(_.owningTeams.exists(t => t.asString.split("\\s+").contains("CIP"))) // built off platform
-      groupedByTeam    =  filteredByCip.take(100)
+      groupedByTeam    =  filteredByCip
                             .flatMap: repo =>
                               repo.owningTeams.map(team => Map(team -> Seq(repo)))
                             .combineAll
@@ -132,8 +132,8 @@ object InactiveTestRepoNotifierService:
     , jobName    : String
     , jenkinsUrl : String
     , duration   : Option[Duration]
-    ): String = 
-      duration match 
+    ): String =
+      duration match
         case Some(duration) => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|$repoName> has a test job: <$jenkinsUrl|$jobName> that hasn't run in ${duration.toDays.toInt} days."
         case None           => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|$repoName> has a test job: <$jenkinsUrl|$jobName> that has no build record."
 
