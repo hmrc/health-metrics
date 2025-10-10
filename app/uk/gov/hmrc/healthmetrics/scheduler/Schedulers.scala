@@ -44,7 +44,7 @@ class Schedulers @Inject()(
 , outdatedDeploymentNotifierService       : OutdatedDeploymentNotifierService
 , productionVulnerabilitiesNotifierService: ProductionVulnerabilitiesNotifierService
 , upcomingBobbyNotifierService            : UpcomingBobbyNotifierService
-, inactiveTestRepoService                 : InactiveTestRepoService
+, inactiveTestRepoNotifierService         : InactiveTestRepoNotifierService
 , mongoLockRepository                     : MongoLockRepository
 , lastRunRepository                       : LastRunRepository
 , teamHealthMetricsRepository             : TeamHealthMetricsRepository
@@ -121,7 +121,7 @@ class Schedulers @Inject()(
   
   scheduleWithLock("Inactive Test Repositories Notifier", "inactive-test-repositories-notifier"): schedulerConfig =>
     run(schedulerConfig):
-      inactiveTestRepoService.notify
+      inactiveTestRepoNotifierService.notify(Instant.now())
 
   private def run(schedulerConfig: SchedulerConfig)(f: => Future[Unit]): Future[Unit] =
     val now   = Instant.now()
@@ -132,7 +132,7 @@ class Schedulers @Inject()(
         .get(schedulerConfig.lockId)
         .flatMap:
           case Some(last) if last.isAfter(after) =>
-            logger.info(s"Not running ${schedulerConfig.label} Scheduler - waiting till e: $last is after $after and inside working hours")
+            logger.info(s"Not running ${schedulerConfig.label} Scheduler - waiting till: $last is after $after and inside working hours")
             Future.unit
           case oLast =>
             logger.info(oLast.fold(s"Running ${schedulerConfig.label} Scheduler for the first time")(d => s"Running ${schedulerConfig.label} Scheduler. Last run date was $d"))
