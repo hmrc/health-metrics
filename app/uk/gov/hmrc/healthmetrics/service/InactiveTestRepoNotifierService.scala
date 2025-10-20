@@ -26,6 +26,7 @@ import java.time.{Duration, Instant}
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import cats.syntax.all.*
+import play.api.libs.json.JsValue
 import play.api.{Configuration, Logging}
 
 
@@ -107,15 +108,21 @@ class InactiveTestRepoNotifierService @Inject()(
               .mkString("\\n")
         .toSeq
 
-    val link = SlackNotificationsConnector.mrkdwnBlock:
-      s"To stay informed on your teams Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue."
+    val actions =
+      Seq(
+        "*Actions*"
+      ,  s"• Stay informed on your team's Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue."
+      ,  s"• Test jobs for inactive test repositories should be removed before deleting or archiving the repo."
+      ).map: action =>
+        SlackNotificationsConnector.mrkdwnBlock:
+          action.mkString("\\n")
 
     SlackNotificationsConnector.Request(
       channelLookup   = SlackNotificationsConnector.ChannelLookup.ByGithubTeam(teamName),
       displayName     = "MDTP Catalogue",
       emoji           = ":tudor-crown:",
       text            = "The test repositories may be inactive",
-      blocks          = Seq(msg) ++ warnings :+ link,
+      blocks          = Seq(msg) ++ warnings ++ actions,
       callbackChannel = Some("team-platops-alerts")
     )
 
