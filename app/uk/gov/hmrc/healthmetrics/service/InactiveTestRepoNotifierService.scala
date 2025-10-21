@@ -110,12 +110,11 @@ class InactiveTestRepoNotifierService @Inject()(
 
     val actions =
       Seq(
-        "*Actions*"
-      ,  s"• Stay informed on your team's Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue."
-      ,  s"• Test jobs for inactive test repositories should be removed before deleting or archiving the repo."
+        "*Actions*",
+        s"• Stay informed on your team's Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue.",
+        s"• Test jobs for inactive test repositories should be removed before deleting or archiving the repo."
       ).map: action =>
-        SlackNotificationsConnector.mrkdwnBlock:
-          action.mkString("\\n")
+        SlackNotificationsConnector.mrkdwnBlock(action)
 
     SlackNotificationsConnector.Request(
       channelLookup   = SlackNotificationsConnector.ChannelLookup.ByGithubTeam(teamName),
