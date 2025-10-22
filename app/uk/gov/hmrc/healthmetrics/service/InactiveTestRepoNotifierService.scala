@@ -94,7 +94,7 @@ class InactiveTestRepoNotifierService @Inject()(
 
   private def infoNotification(teamName: TeamName, testRepos: Seq[InactiveTestRepo]): SlackNotificationsConnector.Request =
     val msg = SlackNotificationsConnector.mrkdwnBlock:
-      s"Hello ${teamName.asString}, the following test repositories may be inactive please review:"
+      s"Hello *${teamName.asString}*, the following test repositories may be inactive please review:"
 
     val warnings =
       testRepos
@@ -111,10 +111,11 @@ class InactiveTestRepoNotifierService @Inject()(
     val actions =
       SlackNotificationsConnector.mrkdwnBlock(
         Seq(
-          "*Actions*",
-          s"• Stay informed on your team's Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue.",
-          s"• Test jobs for inactive test repositories should be removed before deleting or archiving the repo."
-        ).mkString("\\n")
+          "*Next Steps:*",
+          s"• Review and decommission any inactive test repositories.",
+          s"• Remove related jobs before deleting or archiving repositories.",
+          s"• Keep track of your team's Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue."
+        ).mkString("\n")
       )
 
     SlackNotificationsConnector.Request(
