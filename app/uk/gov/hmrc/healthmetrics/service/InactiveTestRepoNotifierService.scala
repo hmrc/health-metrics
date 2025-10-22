@@ -74,7 +74,7 @@ class InactiveTestRepoNotifierService @Inject()(
       reposWithNoJobs  =  allTestRepos
                             .filterNot(testRepo => allTestJobs.map(_.repoName).contains(testRepo.repoName))
                             .map: repo =>
-                              InactiveTestRepo(repo.repoName, s"<https://catalogue.tax.service.gov.uk/repositories/${repo.repoName}|${repo.repoName}> has no test job defined in Jenkins Github repositories.", repo.owningTeams)
+                              InactiveTestRepo(repo.repoName, s"<https://catalogue.tax.service.gov.uk/repositories/${repo.repoName}|*${repo.repoName}*> has no test job defined in Jenkins Github repositories.", repo.owningTeams)
       filteredByCip    =  (reposWithOldJobs ++ reposWithNoJobs).filterNot(_.owningTeams.exists(t => t.asString.split("\\s+").contains("CIP"))) // built off platform
       groupedByTeam    =  filteredByCip
                             .flatMap: repo =>
@@ -93,9 +93,9 @@ class InactiveTestRepoNotifierService @Inject()(
 
   private def infoNotification(teamName: TeamName, testRepos: Seq[InactiveTestRepo]): SlackNotificationsConnector.Request =
     val msg = SlackNotificationsConnector.mrkdwnBlock:
-      s"Hello ${teamName.asString}, the following test repositories may be inactive please review:"
+      s"Hello *${teamName.asString}*, the following test repositories may be inactive please review:"
 
-    val warnings =
+    val messages =
       testRepos
         .toList
         .sortBy(_.repoName.asString)
@@ -103,19 +103,26 @@ class InactiveTestRepoNotifierService @Inject()(
         .map: batch =>
           SlackNotificationsConnector.mrkdwnBlock:
             batch
-              .map(testRepo => s"• ${testRepo.message}")
-              .mkString("\\n")
+              .map(testRepo => s"${testRepo.message}")
+              .mkString("\\n\\n")
         .toSeq
 
-    val link = SlackNotificationsConnector.mrkdwnBlock:
-      s"To stay informed on your teams Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue."
+    val actions =
+      SlackNotificationsConnector.mrkdwnBlock(
+        Seq(
+          "*Next Steps*"
+          , s"• Review and decommission any inactive test repositories."
+          , s"• Remove related jobs before deleting or archiving repositories."
+          , s"• Keep track of your team's Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue."
+        ).mkString("\\n")
+      )
 
     SlackNotificationsConnector.Request(
       channelLookup   = SlackNotificationsConnector.ChannelLookup.ByGithubTeam(teamName),
       displayName     = "MDTP Catalogue",
       emoji           = ":tudor-crown:",
       text            = "The test repositories may be inactive",
-      blocks          = Seq(msg) ++ warnings :+ link,
+      blocks          = Seq(msg) ++ SlackNotificationsConnector.withDivider(messages ++ Seq(actions)),
       callbackChannel = Some("team-platops-alerts")
     )
 
@@ -134,8 +141,8 @@ object InactiveTestRepoNotifierService:
     , duration   : Option[Duration]
     ): String =
       duration match
-        case Some(duration) => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|$repoName> has a test job: <$jenkinsUrl|$jobName> that hasn't run in ${duration.toDays.toInt} days."
-        case None           => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|$repoName> has a test job: <$jenkinsUrl|$jobName> that has no build record."
+        case Some(duration) => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|*$repoName*> has a test job: <$jenkinsUrl|*$jobName*> that hasn't run in ${duration.toDays.toInt} days."
+        case None           => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|*$repoName*> has a test job: <$jenkinsUrl|*$jobName*> that has no build record."
 
     def fromJob(
       repoName   : RepoName
