@@ -75,7 +75,7 @@ class InactiveTestRepoNotifierService @Inject()(
       reposWithNoJobs  =  allTestRepos
                             .filterNot(testRepo => allTestJobs.map(_.repoName).contains(testRepo.repoName))
                             .map: repo =>
-                              InactiveTestRepo(repo.repoName, s"<https://catalogue.tax.service.gov.uk/repositories/${repo.repoName}|${repo.repoName}> has no test job defined in Jenkins Github repositories.", repo.owningTeams)
+                              InactiveTestRepo(repo.repoName, s"<https://catalogue.tax.service.gov.uk/repositories/${repo.repoName}|*${repo.repoName}*> has no test job defined in Jenkins Github repositories.", repo.owningTeams)
       filteredByCip    =  (reposWithOldJobs ++ reposWithNoJobs).filterNot(_.owningTeams.exists(t => t.asString.split("\\s+").contains("CIP"))) // built off platform
       groupedByTeam    =  filteredByCip
                             .flatMap: repo =>
@@ -101,11 +101,9 @@ class InactiveTestRepoNotifierService @Inject()(
         .toList
         .sortBy(_.repoName.asString)
         .grouped(5)
-        .map: batch =>
-          SlackNotificationsConnector.mrkdwnBlock:
-            batch
-              .map(testRepo => s"• ${testRepo.message}")
-              .mkString("\\n")
+        .flatMap: batch =>
+          batch.map: testRepo =>
+            SlackNotificationsConnector.mrkdwnBlock(s"${testRepo.message}")
         .toSeq
 
     val actions =
@@ -123,7 +121,7 @@ class InactiveTestRepoNotifierService @Inject()(
       displayName     = "MDTP Catalogue",
       emoji           = ":tudor-crown:",
       text            = "The test repositories may be inactive",
-      blocks          = Seq(msg) ++ warnings ++ Seq(actions),
+      blocks          = SlackNotificationsConnector.withDivider(Seq(msg) ++ warnings ++ Seq(actions)),
       callbackChannel = Some("team-platops-alerts")
     )
 
@@ -142,8 +140,8 @@ object InactiveTestRepoNotifierService:
     , duration   : Option[Duration]
     ): String =
       duration match
-        case Some(duration) => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|$repoName> has a test job: <$jenkinsUrl|$jobName> that hasn't run in ${duration.toDays.toInt} days."
-        case None           => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|$repoName> has a test job: <$jenkinsUrl|$jobName> that has no build record."
+        case Some(duration) => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|*$repoName*> has a test job: <$jenkinsUrl|$jobName> that hasn't run in ${duration.toDays.toInt} days."
+        case None           => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|*$repoName*> has a test job: <$jenkinsUrl|$jobName> that has no build record."
 
     def fromJob(
       repoName   : RepoName
