@@ -94,25 +94,27 @@ class InactiveTestRepoNotifierService @Inject()(
 
   private def infoNotification(teamName: TeamName, testRepos: Seq[InactiveTestRepo]): SlackNotificationsConnector.Request =
     val msg = SlackNotificationsConnector.mrkdwnBlock:
-      s"Hello ${teamName.asString}, the following test repositories may be inactive please review:"
+      s"Hello *${teamName.asString}*, the following test repositories may be inactive please review:"
 
-    val warnings =
+    val messages =
       testRepos
         .toList
         .sortBy(_.repoName.asString)
         .grouped(5)
-        .flatMap: batch =>
-          batch.map: testRepo =>
-            SlackNotificationsConnector.mrkdwnBlock(s"${testRepo.message}")
+        .map: batch =>
+          SlackNotificationsConnector.mrkdwnBlock:
+            batch
+              .map(testRepo => s"${testRepo.message}")
+              .mkString("\\n\\n")
         .toSeq
 
     val actions =
       SlackNotificationsConnector.mrkdwnBlock(
         Seq(
-          "*Next Steps*",
-          s"• Review and decommission any inactive test repositories.",
-          s"• Remove related jobs before deleting or archiving repositories.",
-          s"• Keep track of your team's Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue."
+          "*Next Steps*"
+        , s"• Review and decommission any inactive test repositories."
+        , s"• Remove related jobs before deleting or archiving repositories."
+        , s"• Keep track of your team's Test Results, visit the <https://catalogue.tax.service.gov.uk/tests?teamName=${teamName.asString}|Test Results Page> in the Catalogue."
         ).mkString("\\n")
       )
 
@@ -121,7 +123,7 @@ class InactiveTestRepoNotifierService @Inject()(
       displayName     = "MDTP Catalogue",
       emoji           = ":tudor-crown:",
       text            = "The test repositories may be inactive",
-      blocks          = SlackNotificationsConnector.withDivider(Seq(msg) ++ warnings ++ Seq(actions)),
+      blocks          = Seq(msg) ++ SlackNotificationsConnector.withDivider(messages ++ Seq(actions)),
       callbackChannel = Some("team-platops-alerts")
     )
 
@@ -140,8 +142,8 @@ object InactiveTestRepoNotifierService:
     , duration   : Option[Duration]
     ): String =
       duration match
-        case Some(duration) => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|*$repoName*> has a test job: <$jenkinsUrl|$jobName> that hasn't run in ${duration.toDays.toInt} days."
-        case None           => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|*$repoName*> has a test job: <$jenkinsUrl|$jobName> that has no build record."
+        case Some(duration) => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|*$repoName*> has a test job: <$jenkinsUrl|*$jobName*> that hasn't run in ${duration.toDays.toInt} days."
+        case None           => s"<https://catalogue.tax.service.gov.uk/repositories/$repoName|*$repoName*> has a test job: <$jenkinsUrl|*$jobName*> that has no build record."
 
     def fromJob(
       repoName   : RepoName
