@@ -162,7 +162,6 @@ class InactiveTestRepoNotifierServiceSpec
         .sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier])
     
     "not notify teams for potentially inactive test repositories unless they meet the inactive repositories criteria" in new Setup:
-      
       when(teamsAndReposConnector.allTestRepos()(using any[HeaderCarrier]))
         .thenReturn(Future.successful(
           Repo(RepoName("repo-1"), Seq.empty, None, false, Seq(TeamName("Team 1"), TeamName("Team 2"))) ::
@@ -188,6 +187,43 @@ class InactiveTestRepoNotifierServiceSpec
       verify(slackNotifcationsConnector, times(0))
         .sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier])
 
+    "not notify teams when they have test repositories in the excluded list" in new Setup:
+      when(teamsAndReposConnector.allTestRepos()(using any[HeaderCarrier]))
+        .thenReturn(Future.successful(
+          Repo(RepoName("excluded-test-repo-1"), Seq.empty, None, false, Seq(TeamName("Team 1"), TeamName("Team 2"))) ::
+          Repo(RepoName("excluded-test-repo-2"), Seq.empty, None, false, Seq(TeamName("Team 1"), TeamName("Team 2"))) ::
+          Nil
+        ))
+
+      when(teamsAndReposConnector.allTestJobs()(using any[HeaderCarrier]))
+        .thenReturn(Future.successful(Seq.empty[JenkinsJob]))
+
+      when(slackNotifcationsConnector.sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier]))
+        .thenReturn(Future.successful(SlackNotificationsConnector.Response(List.empty)))
+
+      service.notify(now).futureValue
+
+      verify(slackNotifcationsConnector, times(0)) // one message per team
+        .sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier])
+
+    "not notify teams containing CIP" in new Setup:
+      when(teamsAndReposConnector.allTestRepos()(using any[HeaderCarrier]))
+        .thenReturn(Future.successful(
+          Repo(RepoName("repo-1"), Seq.empty, None, false, Seq(TeamName("CIP"), TeamName("CIP Advanced Search"), TeamName("CIP Search UI"), TeamName("CIP Insights and Reputation"))) ::
+          Nil
+        ))
+
+      when(teamsAndReposConnector.allTestJobs()(using any[HeaderCarrier]))
+        .thenReturn(Future.successful(Seq.empty[JenkinsJob]))
+
+      when(slackNotifcationsConnector.sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier]))
+        .thenReturn(Future.successful(SlackNotificationsConnector.Response(List.empty)))
+
+      service.notify(now).futureValue
+
+      verify(slackNotifcationsConnector, times(0)) // one message per team
+        .sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier])
+
   case class Setup():
     given HeaderCarrier = HeaderCarrier()
 
@@ -201,6 +237,7 @@ class InactiveTestRepoNotifierServiceSpec
         "inactive-test-repositories-jobs.oldBuildCutoff"    -> "360.days"
       , "inactive-test-repositories-jobs.acceptanceCutoff"  -> "90.days"
       , "inactive-test-repositories-jobs.failedBuildCutoff" -> "30.days"
+      , "excluded-test-repositories"                        -> Seq("excluded-test-repo-1", "excluded-test-repo-2")
       )
 
     val teamsAndReposConnector     = mock[TeamsAndRepositoriesConnector]

@@ -41,10 +41,11 @@ class InactiveTestRepoNotifierService @Inject()(
   private val oldBuildCutoff    = configuration.get[Duration]("inactive-test-repositories-jobs.oldBuildCutoff")
   private val acceptanceCutoff  = configuration.get[Duration]("inactive-test-repositories-jobs.acceptanceCutoff")
   private val failedBuildCutoff = configuration.get[Duration]("inactive-test-repositories-jobs.failedBuildCutoff")
-
+  private val excludedTestRepos = configuration.get[Seq[String]]("excluded-test-repositories").map(RepoName(_)).toSet
+  
   def notify(now: Instant)(using hc: HeaderCarrier): Future[Unit] =
     for
-      allTestRepos     <- teamsAndRepositoriesConnector.allTestRepos()
+      allTestRepos     <- teamsAndRepositoriesConnector.allTestRepos().map(withoutExcludedTestRepos)
       allTestJobs      <- teamsAndRepositoriesConnector.allTestJobs()
       reposWithOldJobs =  allTestJobs.flatMap: job =>
                             val owningTeams = allTestRepos.find(_.repoName == job.repoName).map(_.owningTeams).getOrElse(Seq.empty[TeamName])
@@ -90,6 +91,9 @@ class InactiveTestRepoNotifierService @Inject()(
                            case (team, rsp) if rsp.errors.nonEmpty => logger.warn(s"Sending Inactive Test Repository message to ${team.asString} had errors ${rsp.errors.mkString(" : ")}")
                            case (team, _)                          => logger.info(s"Successfully sent Inactive Test Repository message to ${team.asString}")
     yield ()
+
+  private def withoutExcludedTestRepos(repos: Seq[TeamsAndRepositoriesConnector.Repo]) =
+    repos.filterNot(r => excludedTestRepos.contains(r.repoName))
 
   private def infoNotification(teamName: TeamName, testRepos: Seq[InactiveTestRepo]): SlackNotificationsConnector.Request =
     val msg = SlackNotificationsConnector.mrkdwnBlock:
