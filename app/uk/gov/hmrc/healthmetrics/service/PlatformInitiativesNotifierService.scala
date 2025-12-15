@@ -50,7 +50,7 @@ class PlatformInitiativesNotifierService @Inject()(
       teamsOnScala2OrPlay2 <- oldArtefacts.flatTraverse:
                                 case (group, artefact) =>
                                   serviceDependenciesConnector
-                                    .getTeams(group, artefact)
+                                    .getAllProdByArtefact(group, artefact)
                                     .map(_.flatMap(_.teamNames))
                               .map(_.toSet)
       teamsToNotify        = teamsOnScala2OrPlay2 ++ teamsOnOldJdk

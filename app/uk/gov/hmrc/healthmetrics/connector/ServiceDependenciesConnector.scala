@@ -69,7 +69,7 @@ class ServiceDependenciesConnector @Inject() (
       .get(url"$url/api/repoDependencies?group=$group&artefact=$artefact&versionRange=$versionRange&repoType=Service")
       .execute[Seq[ServiceDependenciesConnector.AffectedService]]
 
-  def getTeams(
+  def getAllProdByArtefact(
     group: String
   , artefact: String
   )(using HeaderCarrier): Future[Seq[ServiceDependenciesConnector.AffectedService]] =
