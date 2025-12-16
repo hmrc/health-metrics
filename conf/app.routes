@@ -1,6 +1,7 @@
 # microservice specific routes
 
 GET        /teams/:team/health-metrics/latest                       uk.gov.hmrc.healthmetrics.controllers.HealthMetricsController.latestTeamHealthMetrics(team: TeamName)
+GET        /fake                                                    uk.gov.hmrc.healthmetrics.controllers.HealthMetricsController.fake()
 
 GET        /digital-services/:digitalService/health-metrics/latest  uk.gov.hmrc.healthmetrics.controllers.HealthMetricsController.latestDigitalServiceHealthMetrics(digitalService: DigitalService)
 
