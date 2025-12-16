@@ -68,13 +68,13 @@ class PlatformInitiativesNotifierService @Inject()(
   private def initiativeNotification(teamName: TeamName): SlackNotificationsConnector.Request =
     val msg = SlackNotificationsConnector.mrkdwnBlock:
       s"Hello ${teamName.asString}, <https://catalogue.tax.service.gov.uk/platform-initiatives?team=${teamName.asString}|Platform Initiatives> " +
-        s"has recommendations for respositories you own, please review and address."
+        s"lists outstanding upgrades for your repositories. Please review and address them."
 
     SlackNotificationsConnector.Request(
       channelLookup   = SlackNotificationsConnector.ChannelLookup.ByGithubTeam(teamName),
       displayName     = "MDTP Catalogue",
       emoji           = ":tudor-crown:",
-      text            = "Repo(s) owned by you do not meet platform recommendations",
+      text            = "Repositories you own have outstanding upgrades",
       blocks          = Seq(msg),
       callbackChannel = Some("team-platops-alerts")
     )
