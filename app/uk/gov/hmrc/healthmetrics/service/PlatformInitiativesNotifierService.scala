@@ -35,7 +35,7 @@ class PlatformInitiativesNotifierService @Inject()(
 
   def notify()(using hc: HeaderCarrier): Future[Unit] =
     val oldArtefacts = Seq("com.typesafe.play" -> "play", "org.scala-lang" -> "scala-library")
-    val recommendedJdk = "21.0"
+    val recommendedJdk = "21"
 
     for      
       reposOnOldJdk        <- serviceDependenciesConnector
