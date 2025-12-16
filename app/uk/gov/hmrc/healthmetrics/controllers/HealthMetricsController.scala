@@ -47,6 +47,7 @@ class HealthMetricsController @Inject()(
         .map: metrics =>
           Ok(Json.toJson(LatestHealthMetrics(metrics)))
 
+
   def latestDigitalServiceHealthMetrics(digitalService: DigitalService): Action[AnyContent] =
     Action.async: request =>
       given RequestHeader               = request
