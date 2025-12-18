@@ -67,7 +67,7 @@ class PlatformInitiativesNotifierService @Inject()(
 
   private def initiativeNotification(teamName: TeamName): SlackNotificationsConnector.Request =
     val msg = SlackNotificationsConnector.mrkdwnBlock:
-      s"Hello ${teamName.asString}, <https://catalogue.tax.service.gov.uk/platform-initiatives?team=${teamName.asString}|Platform Initiatives> " +
+      s"Hello ${teamName.asString}, <https://catalogue.tax.service.gov.uk/platform-initiatives?team=${teamName.urlEncoded}|Platform Initiatives> " +
         s"lists outstanding upgrades for your repositories. Please review and address them."
 
     SlackNotificationsConnector.Request(

@@ -20,6 +20,8 @@ import play.api.mvc.{PathBindable, QueryStringBindable}
 import play.api.libs.functional.syntax.*
 import play.api.libs.json.*
 import uk.gov.hmrc.healthmetrics.util.{Binders, FromString, FromStringEnum, Parser}
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 package object model:
 
@@ -47,7 +49,8 @@ package object model:
 
   type MetricFilter = TeamName | DigitalService
 
-  case class TeamName(asString: String) extends AnyVal
+  case class TeamName(asString: String) extends AnyVal:
+    def urlEncoded: String = URLEncoder.encode(asString, StandardCharsets.UTF_8.name())
 
   object TeamName extends StringAnyValUtils(TeamName.apply, _.asString):
     val nameReads: Reads[TeamName] =
