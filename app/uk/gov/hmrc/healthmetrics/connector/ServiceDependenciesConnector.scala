@@ -27,6 +27,9 @@ import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, SlugInfoFl
 import java.time.LocalDate
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
+import uk.gov.hmrc.healthmetrics.model.Version
+import play.api.libs.json.Format
+import uk.gov.hmrc.healthmetrics.connector.ServiceDependenciesConnector.SlugJdkVersion
 
 @Singleton
 class ServiceDependenciesConnector @Inject() (
@@ -66,6 +69,20 @@ class ServiceDependenciesConnector @Inject() (
       .get(url"$url/api/repoDependencies?group=$group&artefact=$artefact&versionRange=$versionRange&repoType=Service")
       .execute[Seq[ServiceDependenciesConnector.AffectedService]]
 
+  def getAllProdByArtefact(
+    group: String
+  , artefact: String
+  )(using HeaderCarrier): Future[Seq[ServiceDependenciesConnector.AffectedService]] =
+    given Reads[ServiceDependenciesConnector.AffectedService] = ServiceDependenciesConnector.AffectedService.reads
+    httpClientV2
+      .get(url"$url/api/repoDependencies?group=$group&artefact=$artefact&flag=production")
+      .execute[Seq[ServiceDependenciesConnector.AffectedService]]
+
+  def getSlugJdkVersions()(using HeaderCarrier): Future[Seq[SlugJdkVersion]] =
+   httpClientV2
+     .get(url"$url/api/jdkVersions?flag=production")
+     .execute[Seq[SlugJdkVersion]]
+  
 object ServiceDependenciesConnector:
   case class BobbyReport(repoName: RepoName, violations: Seq[BobbyReport.Violation])
   object BobbyReport:
@@ -91,3 +108,13 @@ object ServiceDependenciesConnector:
       ( (__ \ "repoName").read[String      ].map(ServiceName.apply)
       ~ (__ \ "teams"   ).read[List[String]].map(_.map(TeamName.apply))
       )(AffectedService.apply _)
+
+  case class SlugJdkVersion(name: String, version: String, vendor: String, kind: String)
+
+  object SlugJdkVersion:
+    given format: Format[SlugJdkVersion] =
+    ( (__ \ "name"   ).format[String]
+    ~ (__ \ "version").format[String]
+    ~ (__ \ "vendor" ).format[String]
+    ~ (__ \ "kind"   ).format[String]
+    )(SlugJdkVersion.apply, sjv => Tuple.fromProductTyped(sjv))
