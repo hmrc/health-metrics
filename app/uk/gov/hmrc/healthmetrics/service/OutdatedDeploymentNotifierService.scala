@@ -30,7 +30,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class OutdatedDeploymentNotifierService @Inject()(
-  configuration                : Configuration,
   releasesConnector            : ReleasesConnector,
   slackNotificationsConnector  : SlackNotificationsConnector,
   teamsAndRepositoriesConnector: TeamsAndRepositoriesConnector
@@ -38,21 +37,18 @@ class OutdatedDeploymentNotifierService @Inject()(
   ec: ExecutionContext
 ) extends Logging:
 
-  private val minimumDeploymentAge =
-    configuration.get[Duration]("outdated-deployment-notifier.minimumDeploymentAge")
-
-  def notify(runTime: Instant)(using hc: HeaderCarrier): Future[Unit] =
+  def notify()(using hc: HeaderCarrier): Future[Unit] =
     for
       teams        <- teamsAndRepositoriesConnector.allTeams()
       releases     <- releasesConnector.releases()
-      timeLimit     = runTime
-                        .truncatedTo(ChronoUnit.DAYS)
-                        .minus(minimumDeploymentAge.toDays, ChronoUnit.DAYS)
       outdated      = releases.flatMap: wrw =>
-                        val latest = wrw.deployments.maxBy(_.version).version
-                        wrw.deployments.collect:
-                          case d if d.environment != Environment.Production && d.version < latest && d.lastDeployed.isBefore(timeLimit) =>
-                            (wrw.serviceName, d.environment, d.version, latest)
+                        val prodVersionOpt = wrw.deployments.find(_.environment == Environment.Production).map(_.version)
+                        prodVersionOpt match
+                          case Some(prodVersion) =>
+                            wrw.deployments.collect:
+                              case d if d.environment != Environment.Production && d.version < prodVersion =>
+                                (wrw.serviceName, d.environment, d.version, prodVersion)
+                          case None => Nil
       byTeam        = teams
                         .map( team => (
                           team.name,
@@ -87,8 +83,8 @@ class OutdatedDeploymentNotifierService @Inject()(
 
     val bulletLines: Seq[String] =
       outdated.map:
-        case (service, env, deployed, latest) =>
-          s"• <https://catalogue.tax.service.gov.uk/repositories/${service.asString}|${service.asString}> is running $deployed in ${env.asString} (latest: $latest)."
+        case (service, env, deployed, prodVersion) =>
+          s"• <https://catalogue.tax.service.gov.uk/repositories/${service.asString}|${service.asString}> is running $deployed in ${env.asString} (Production: $prodVersion)."
 
     // Break into chunks of max 10 lines each to stay under Slack's 3000 char per block limit
     val bulletBlocks: Seq[JsValue] =

@@ -41,11 +41,11 @@ class OutdatedDeploymentNotifierServiceSpec
      with MockitoSugar:
 
   "OutdatedDeploymentNotifierService.notify" should:
-    "notify teams when they have outdated versions deployed in an environment for longer than 7 days" in new Setup:
+    "notify teams when they have outdated versions deployed in an environment compared to Production" in new Setup:
       val stagingDeployment = Deployment(Environment.Staging, Version("1.0.0"), eightDaysAgo)
       val qaDeployment = Deployment(Environment.QA, Version("0.9.0"), eightDaysAgo)
       val externalTestDeployment = Deployment(Environment.ExternalTest, Version("1.0.0"), eightDaysAgo)
-      val productionDeployment = Deployment(Environment.ExternalTest, Version("1.0.0"), eightDaysAgo)
+      val productionDeployment = Deployment(Environment.Production, Version("1.0.0"), eightDaysAgo)
 
       when(releasesConnector.releases(any[Option[MetricFilter]])(using any[HeaderCarrier]))
         .thenReturn(Future.successful(
@@ -64,21 +64,21 @@ class OutdatedDeploymentNotifierServiceSpec
       when(slackNotificationsConnector.sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier]))
         .thenReturn(Future.successful(SlackNotificationsConnector.Response(List.empty)))
 
-      service.notify(now).futureValue
+      service.notify().futureValue
 
       verify(slackNotificationsConnector, times(2)) // one message per team
         .sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier])
 
-  "not notify teams when they have outdated versions deployed in an environment for less than 7 days" in new Setup:
+  "not notify teams when they have outdated versions deployed in an environment but Production is not higher" in new Setup:
     val stagingDeployment      = Deployment(Environment.Staging, Version("1.0.0"), yesterday)
     val qaDeployment           = Deployment(Environment.QA, Version("0.9.0"), yesterday)
     val externalTestDeployment = Deployment(Environment.ExternalTest, Version("1.0.0"), yesterday)
-    val productionDeployment   = Deployment(Environment.ExternalTest, Version("1.0.0"), yesterday)
+    val productionDeployment   = Deployment(Environment.Production, Version("0.9.0"), yesterday)
 
     when(releasesConnector.releases(any[Option[MetricFilter]])(using any[HeaderCarrier]))
       .thenReturn(Future.successful(
         WhatsRunningWhere(ServiceName("repo-1"), List(stagingDeployment, qaDeployment, externalTestDeployment, productionDeployment)) ::
-          WhatsRunningWhere(ServiceName("repo-2"), List(stagingDeployment, qaDeployment, externalTestDeployment, productionDeployment.copy(version = Version("2.0.0")))) ::
+          WhatsRunningWhere(ServiceName("repo-2"), List(stagingDeployment.copy(version = Version("0.9.0")), qaDeployment, externalTestDeployment, productionDeployment)) ::
           Nil
       ))
 
@@ -92,9 +92,9 @@ class OutdatedDeploymentNotifierServiceSpec
     when(slackNotificationsConnector.sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier]))
       .thenReturn(Future.successful(SlackNotificationsConnector.Response(List.empty)))
 
-    service.notify(now).futureValue
+    service.notify().futureValue
 
-    verify(slackNotificationsConnector, times(0)) // no deployments older than 7 days
+    verify(slackNotificationsConnector, times(0)) // no versions deployed that are older than Production
       .sendMessage(any[SlackNotificationsConnector.Request])(using any[HeaderCarrier])
 
 
@@ -105,13 +105,8 @@ class OutdatedDeploymentNotifierServiceSpec
     val eightDaysAgo: Instant = now.minus(8L, DAYS)
     val yesterday: Instant = now.minus(1L, DAYS)
 
-    val mockConfiguration: Configuration =
-      Configuration(
-        "outdated-deployment-notifier.minimumDeploymentAge" -> "7.days"
-      )
-
     val releasesConnector            = mock[ReleasesConnector]
     val slackNotificationsConnector  = mock[SlackNotificationsConnector]
     val teamsAndReposConnector       = mock[TeamsAndRepositoriesConnector]
 
-    val service = new OutdatedDeploymentNotifierService(mockConfiguration, releasesConnector, slackNotificationsConnector, teamsAndReposConnector)
+    val service = new OutdatedDeploymentNotifierService(releasesConnector, slackNotificationsConnector, teamsAndReposConnector)
