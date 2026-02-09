@@ -118,7 +118,7 @@ class Schedulers @Inject()(
 
   scheduleWithLock("Outdated Deployment Notifier", "outdated-deployment-notifier"): schedulerConfig =>
     run(schedulerConfig):
-      outdatedDeploymentNotifierService.notify(Instant.now())
+      outdatedDeploymentNotifierService.notify()
   
   scheduleWithLock("Inactive Test Repositories Notifier", "inactive-test-repositories-notifier"): schedulerConfig =>
     run(schedulerConfig):
