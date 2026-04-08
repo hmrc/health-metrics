@@ -46,22 +46,12 @@ class ProductionVulnerabilitiesNotifierService @Inject()(
                            .groupBy(_.service)
                            .toSeq
                            .flatMap { case (service, occurrences) =>
-                             val owningTeams = reposByName.get(service).toSeq.flatMap(_.flatMap(_.owningTeams))
-                             if owningTeams.nonEmpty then
-                               owningTeams.map(_ -> Set(service))
-                             else
-                               val vulnerabilityTeams = occurrences.flatMap(_.teams).distinct
-                               if vulnerabilityTeams.nonEmpty then
-                                 logger.warn(s"Service $service has no owning teams in teams-and-repositories, falling back to vulnerability teams: ${vulnerabilityTeams.map(_.asString).mkString(", ")}")
-                                 vulnerabilityTeams.map(_ -> Set(service))
-                               else
-                                 logger.warn(s"Service $service has no owning teams and no vulnerability teams, skipping")
-                                 Seq.empty
+                             teamsForService(service, occurrences, reposByName).map(_ -> Set(service))
                            }
                            .groupMapReduce(_._1)(_._2)(_.union(_))
       responses       <- teamsToNotify.toList.foldLeftM(List.empty[(TeamName, SlackNotificationsConnector.Response)]):
                            (acc, teamServices) =>
-                            val (team, services) = teamServices
+                             val (team, services) = teamServices
                              slackNotificationsConnector
                                .sendMessage(errorNotification(team, services))
                                .map(resp => acc :+ (team, resp))
@@ -69,6 +59,18 @@ class ProductionVulnerabilitiesNotifierService @Inject()(
                            case (team, rsp) if rsp.errors.nonEmpty => logger.warn(s"Sending Vulnerabilities in Production message to $team had errors ${rsp.errors.mkString(" : ")}")
                            case (team, _)                          => logger.info(s"Successfully sent Vulnerabilities in Production message to $team")
     yield ()
+
+  private def teamsForService(
+    service    : String,
+    occurrences: Seq[VulnerabilitiesConnector.VulnerabilityOccurrence],
+    reposByName: Map[String, Seq[TeamsAndRepositoriesConnector.Repo]]
+  ): Seq[TeamName] =
+    val owningTeams = reposByName.get(service).toSeq.flatMap(_.flatMap(_.owningTeams))
+    if owningTeams.nonEmpty then
+      owningTeams
+    else
+      logger.warn(s"Service $service has no owning teams in teams-and-repositories, falling back to teams captured from vulnerability occurrences")
+      occurrences.flatMap(_.teams)
 
   private def errorNotification(teamName: TeamName, services: Set[String]): SlackNotificationsConnector.Request =
     val heading = SlackNotificationsConnector.mrkdwnBlock:
