@@ -17,14 +17,12 @@
 package uk.gov.hmrc.healthmetrics.service
 
 import cats.implicits.*
-import play.api.{Configuration, Logging}
+import play.api.Logging
 import play.api.libs.json.JsValue
 import uk.gov.hmrc.healthmetrics.connector.{ReleasesConnector, SlackNotificationsConnector, TeamsAndRepositoriesConnector}
 import uk.gov.hmrc.healthmetrics.model.*
 import uk.gov.hmrc.http.HeaderCarrier
 
-import java.time.{Duration, Instant}
-import java.time.temporal.ChronoUnit
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
