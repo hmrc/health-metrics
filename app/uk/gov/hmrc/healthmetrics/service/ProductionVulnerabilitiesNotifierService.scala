@@ -16,19 +16,22 @@
 
 package uk.gov.hmrc.healthmetrics.service
 
-import cats.implicits._
+import cats.implicits.*
+
 import javax.inject.{Inject, Singleton}
 import play.api.Logging
+
 import scala.concurrent.{ExecutionContext, Future}
 import uk.gov.hmrc.healthmetrics.model.SlugInfoFlag
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.healthmetrics.connector.{SlackNotificationsConnector, VulnerabilitiesConnector}
+import uk.gov.hmrc.healthmetrics.connector.{SlackNotificationsConnector, TeamsAndRepositoriesConnector, VulnerabilitiesConnector}
 import uk.gov.hmrc.healthmetrics.model.TeamName
 
 @Singleton
 class ProductionVulnerabilitiesNotifierService @Inject()(
   vulnerabilitiesConnector   : VulnerabilitiesConnector,
-  slackNotificationsConnector: SlackNotificationsConnector
+  slackNotificationsConnector: SlackNotificationsConnector,
+  teamsAndRepositoriesConnector: TeamsAndRepositoriesConnector
 )(using
   ec: ExecutionContext
 ) extends Logging:
@@ -36,13 +39,19 @@ class ProductionVulnerabilitiesNotifierService @Inject()(
   def notify()(using hc: HeaderCarrier): Future[Unit] =
     for
       vulnerabilities <- vulnerabilitiesConnector.vulnerabilitySummaries(flag = Some(SlugInfoFlag.Production.asString))
+      repositories    <- teamsAndRepositoriesConnector.allRepos()
+      reposByName     =  repositories.groupBy(_.repoName.asString)
       teamsToNotify   =  vulnerabilities
                            .flatMap(_.occurrences)
-                           .flatMap(occurrence => occurrence.teams.map(_ -> Set(occurrence.service)))
+                           .groupBy(_.service)
+                           .toSeq
+                           .flatMap { case (service, occurrences) =>
+                             teamsForService(service, occurrences, reposByName).map(_ -> Set(service))
+                           }
                            .groupMapReduce(_._1)(_._2)(_.union(_))
       responses       <- teamsToNotify.toList.foldLeftM(List.empty[(TeamName, SlackNotificationsConnector.Response)]):
                            (acc, teamServices) =>
-                            val (team, services) = teamServices
+                             val (team, services) = teamServices
                              slackNotificationsConnector
                                .sendMessage(errorNotification(team, services))
                                .map(resp => acc :+ (team, resp))
@@ -50,6 +59,18 @@ class ProductionVulnerabilitiesNotifierService @Inject()(
                            case (team, rsp) if rsp.errors.nonEmpty => logger.warn(s"Sending Vulnerabilities in Production message to $team had errors ${rsp.errors.mkString(" : ")}")
                            case (team, _)                          => logger.info(s"Successfully sent Vulnerabilities in Production message to $team")
     yield ()
+
+  private def teamsForService(
+    service    : String,
+    occurrences: Seq[VulnerabilitiesConnector.VulnerabilityOccurrence],
+    reposByName: Map[String, Seq[TeamsAndRepositoriesConnector.Repo]]
+  ): Seq[TeamName] =
+    val owningTeams = reposByName.get(service).toSeq.flatMap(_.flatMap(_.owningTeams))
+    if owningTeams.nonEmpty then
+      owningTeams
+    else
+      logger.warn(s"Service $service has no owning teams in teams-and-repositories, falling back to teams captured from vulnerability occurrences")
+      occurrences.flatMap(_.teams)
 
   private def errorNotification(teamName: TeamName, services: Set[String]): SlackNotificationsConnector.Request =
     val heading = SlackNotificationsConnector.mrkdwnBlock:

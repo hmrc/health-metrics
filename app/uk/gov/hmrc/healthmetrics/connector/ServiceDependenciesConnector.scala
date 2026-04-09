@@ -17,19 +17,16 @@
 package uk.gov.hmrc.healthmetrics.connector
 
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
-import play.api.libs.json.{Reads, __}
-import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
+import play.api.libs.json.{Format, Reads, __}
+import uk.gov.hmrc.healthmetrics.connector.ServiceDependenciesConnector.{BobbyReport, SlugJdkVersion}
+import uk.gov.hmrc.healthmetrics.model.*
 import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
-import uk.gov.hmrc.healthmetrics.connector.ServiceDependenciesConnector.BobbyReport
-import uk.gov.hmrc.healthmetrics.model.{DigitalService, MetricFilter, SlugInfoFlag, TeamName, ServiceName, RepoName}
 
 import java.time.LocalDate
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
-import uk.gov.hmrc.healthmetrics.model.Version
-import play.api.libs.json.Format
-import uk.gov.hmrc.healthmetrics.connector.ServiceDependenciesConnector.SlugJdkVersion
 
 @Singleton
 class ServiceDependenciesConnector @Inject() (
@@ -39,7 +36,7 @@ class ServiceDependenciesConnector @Inject() (
   ec: ExecutionContext
 ):
 
-  import uk.gov.hmrc.http.HttpReads.Implicits._
+  import uk.gov.hmrc.http.HttpReads.Implicits.*
 
   private val url: String =
     servicesConfig.baseUrl("service-dependencies")
