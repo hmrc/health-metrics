@@ -49,7 +49,7 @@ class ReleasesConnector @Inject() (
       case None                       => Map.empty
 
     httpClientV2
-      .get(url"$url/releases-api/whats-running-where?${params(metricFilter)}")
+      .get(url"$url/api/whats-running-where?${params(metricFilter)}")
       .execute[Seq[WhatsRunningWhere]]
 
 object ReleasesConnector:

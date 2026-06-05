@@ -42,7 +42,7 @@ class SlackNotificationsConnectorSpec
         val expectedResponse = SlackNotificationsConnector.Response(errors = Nil)
 
         stubFor(
-          post(urlEqualTo("/slack-notifications/v2/notification"))
+          post(urlEqualTo("/api/v2/notification"))
             .willReturn(
               aResponse()
                 .withStatus(200)
@@ -84,7 +84,7 @@ class SlackNotificationsConnectorSpec
         response shouldBe expectedResponse
 
         verify(
-          postRequestedFor(urlEqualTo("/slack-notifications/v2/notification"))
+          postRequestedFor(urlEqualTo("/api/v2/notification"))
             .withRequestBody(equalToJson(
               """{
              "channelLookup": {
