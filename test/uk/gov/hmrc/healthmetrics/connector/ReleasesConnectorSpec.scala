@@ -70,7 +70,7 @@ class ReleasesConnectorSpec
 
     "return all releases" in:
       stubFor:
-        WireMock.get(urlEqualTo("/api/whats-running-where"))
+        WireMock.get(urlEqualTo("/releases-api/whats-running-where"))
           .willReturn:
             aResponse()
               .withStatus(200)
@@ -83,7 +83,7 @@ class ReleasesConnectorSpec
 
     "return all releases for a team" in:
       stubFor:
-        WireMock.get(urlEqualTo("/api/whats-running-where?teamName=Team+1"))
+        WireMock.get(urlEqualTo("/releases-api/whats-running-where?teamName=Team+1"))
           .willReturn:
             aResponse()
               .withStatus(200)
@@ -96,7 +96,7 @@ class ReleasesConnectorSpec
 
     "return all releases for a digital service" in:
       stubFor:
-        WireMock.get(urlEqualTo("/api/whats-running-where?digitalService=Digital+Service+1"))
+        WireMock.get(urlEqualTo("/releases-api/whats-running-where?digitalService=Digital+Service+1"))
           .willReturn:
             aResponse()
               .withStatus(200)
@@ -107,7 +107,7 @@ class ReleasesConnectorSpec
         .futureValue
         .shouldBe(expectedReleases)
 
-  private val whatsRunningWhereJson: String =
+  private lazy val whatsRunningWhereJson: String =
     """[
       {
         "applicationName": "application-1",
