@@ -107,7 +107,7 @@ class ReleasesConnectorSpec
         .futureValue
         .shouldBe(expectedReleases)
 
-  private val whatsRunningWhereJson: String =
+  private lazy val whatsRunningWhereJson: String =
     """[
       {
         "applicationName": "application-1",
