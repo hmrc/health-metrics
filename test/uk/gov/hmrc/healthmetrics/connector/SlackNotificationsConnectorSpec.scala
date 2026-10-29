@@ -42,7 +42,7 @@ class SlackNotificationsConnectorSpec
         val expectedResponse = SlackNotificationsConnector.Response(errors = Nil)
 
         stubFor(
-          post(urlEqualTo("/api/v2/notification"))
+          post(urlEqualTo("/slack-notifications/v2/notification"))
             .willReturn(
               aResponse()
                 .withStatus(200)
@@ -84,7 +84,7 @@ class SlackNotificationsConnectorSpec
         response shouldBe expectedResponse
 
         verify(
-          postRequestedFor(urlEqualTo("/api/v2/notification"))
+          postRequestedFor(urlEqualTo("/slack-notifications/v2/notification"))
             .withRequestBody(equalToJson(
               """{
              "channelLookup": {
@@ -99,3 +99,31 @@ class SlackNotificationsConnectorSpec
             ))
             .withHeader("Authorization", equalTo("token"))
         )
+
+      "return an error response rather than failing when slack-notifications returns 404" in:
+        stubFor(
+          post(urlEqualTo("/slack-notifications/v2/notification"))
+            .willReturn(aResponse().withStatus(404))
+        )
+
+        val configuration =
+          Configuration(
+            "microservice.services.slack-notifications.host"      -> wireMockHost,
+            "microservice.services.slack-notifications.port"      -> wireMockPort,
+            "microservice.services.slack-notifications.authToken" -> "token"
+          )
+
+        val connector = SlackNotificationsConnector(configuration, ServicesConfig(configuration), httpClientV2)
+
+        val slackMessage =
+          SlackNotificationsConnector.Request(
+            channelLookup = SlackNotificationsConnector.ChannelLookup.ByGithubTeam(teamName = TeamName("PlatUI")),
+            displayName   = "BobbyWarnings",
+            emoji         = ":platops-bobby:",
+            text          = "text",
+            blocks        = Seq.empty[JsObject]
+          )
+
+        val response = connector.sendMessage(slackMessage)(using HeaderCarrier(authorization = None)).futureValue
+
+        response.errors.map(_.code) shouldBe List("request-failed")

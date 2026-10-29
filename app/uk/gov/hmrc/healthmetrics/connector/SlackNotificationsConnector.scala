@@ -49,15 +49,17 @@ class SlackNotificationsConnector @Inject()(
     given Writes[Request] = Request.writes
     given Reads[Response] = Response.reads
     httpClientV2
-      .post(url"$baseUrl/api/v2/notification")
+      .post(url"$baseUrl/slack-notifications/v2/notification")
       .withBody:
         Json.toJson(channelOverride.fold(request)(c => request.copy(channelLookup = ChannelLookup.ByChannels(Seq(c)))))
       .setHeader("Authorization" -> token)
       .execute[Response]
-      .recoverWith:
+      .recover:
+        // Don't fail the Future: callers notify teams sequentially, and one failure (e.g. 404 for an unresolvable
+        // or private channel) would otherwise prevent every remaining team from being notified.
         case NonFatal(ex) =>
           logger.error(s"Unable to notify ${request.channelLookup} on Slack", ex)
-          Future.failed(ex)
+          Response(List(Error("request-failed", ex.getMessage)))
 
 
 object SlackNotificationsConnector:
